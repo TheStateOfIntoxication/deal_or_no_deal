@@ -58,18 +58,6 @@ function mountGame(): ReturnType<typeof mount> {
 
 /** 开局：选经典玩法卡 → 稳重角色 → 摇第一颗金球并开始，返回抽到的 k */
 async function passDraw(wrapper: ReturnType<typeof mount>): Promise<number> {
-  const modeCard = wrapper.find('[data-mode="classic"]')
-  expect(modeCard.exists()).toBe(true)
-  await modeCard.trigger('click')
-  await wrapper.vm.$nextTick()
-
-  const modeButton = wrapper
-    .findAll('.setup__actions button')
-    .find((item) => item.text().includes(t('ModeConfirm')))
-  expect(modeButton).toBeDefined()
-  await modeButton?.trigger('click')
-  await wrapper.vm.$nextTick()
-
   const personaCard = wrapper.find('[data-persona="pragmatic"]')
   expect(personaCard.exists()).toBe(true)
   await personaCard.trigger('click')
@@ -80,6 +68,18 @@ async function passDraw(wrapper: ReturnType<typeof mount>): Promise<number> {
     .find((item) => item.text().includes(t('PersonaConfirm')))
   expect(personaButton).toBeDefined()
   await personaButton?.trigger('click')
+  await wrapper.vm.$nextTick()
+
+  const modeCard = wrapper.find('[data-mode="classic"]')
+  expect(modeCard.exists()).toBe(true)
+  await modeCard.trigger('click')
+  await wrapper.vm.$nextTick()
+
+  const modeButton = wrapper
+    .findAll('.setup__actions button')
+    .find((item) => item.text().includes(t('ModeConfirm')))
+  expect(modeButton).toBeDefined()
+  await modeButton?.trigger('click')
   await wrapper.vm.$nextTick()
 
   const balls = wrapper.findAll('.draw-panel__ball')
@@ -147,8 +147,9 @@ describe('游戏页冒烟', () => {
     const wrapper = mountGame()
     await wrapper.vm.$nextTick()
 
-    // 开局阶段：先看到两张背面玩法卡，没有箱池
-    expect(wrapper.findAll('.mode-card')).toHaveLength(2)
+    // 开局阶段：先选角色，再进入玩法卡；此时还没有箱池
+    expect(wrapper.findAll('.persona-card')).toHaveLength(10)
+    expect(wrapper.findAll('.mode-card')).toHaveLength(0)
     expect(wrapper.find('.case-grid__case').exists()).toBe(false)
 
     await pickAndOpenFirstRound(wrapper)
@@ -248,7 +249,7 @@ describe('游戏页冒烟', () => {
     expect(restartButton).toBeDefined()
     await new DOMWrapper(restartButton as HTMLElement).trigger('click')
     await wrapper.vm.$nextTick()
-    expect(wrapper.findAll('.mode-card')).toHaveLength(2)
+    expect(wrapper.findAll('.persona-card')).toHaveLength(10)
     expect(wrapper.find('.case-grid__case').exists()).toBe(false)
 
     wrapper.unmount()

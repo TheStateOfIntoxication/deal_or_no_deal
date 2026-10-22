@@ -12,9 +12,10 @@ import type { AmountGradeEnum, DecidedByType, PayoutGradeEnum } from '@/types/ga
 
 /** 开局准备阶段 */
 export enum SetupPhaseEnum {
+  personaPick = 'personaPick',
   modeDraw = 'modeDraw',
   modeReveal = 'modeReveal',
-  personaPick = 'personaPick',
+  bankerPick = 'bankerPick',
   modeSetup = 'modeSetup',
   playing = 'playing'
 }

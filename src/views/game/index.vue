@@ -15,7 +15,9 @@ const {
   setupPhase,
   modeDeck,
   selectedMode,
+  bankerId,
   personaId,
+  modeFaceUp,
   mode,
   modeLabel,
   personaLabel,
@@ -56,6 +58,8 @@ const {
   handleModeConfirm,
   handlePersonaPick,
   handlePersonaConfirm,
+  handleBankerPick,
+  handleBankerConfirm,
   handlePick,
   beginGame,
   resetDraw,
@@ -104,7 +108,7 @@ const dialogState = computed(() => ({
       :mode-deck="modeDeck"
       :selected-mode="selectedMode"
       :mode="mode"
-      :persona-id="personaId"
+      :persona-id="personaId" :banker-id="bankerId" :mode-face-up="modeFaceUp"
       :draw-candidates="drawCandidates"
       :picked-index="pickedIndex"
       :draw-lowest-amount="drawLowestAmount"
@@ -113,7 +117,7 @@ const dialogState = computed(() => ({
       @mode-rethink="handleModeRethink"
       @mode-confirm="handleModeConfirm"
       @persona-pick="handlePersonaPick"
-      @persona-confirm="handlePersonaConfirm"
+      @persona-confirm="handlePersonaConfirm" @banker-pick="handleBankerPick" @banker-confirm="handleBankerConfirm"
       @pick="handlePick"
       @start="beginGame"
     />

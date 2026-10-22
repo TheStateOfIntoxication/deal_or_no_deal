@@ -225,6 +225,14 @@ const LUCKY: PersonaStrategy = {
   }
 }
 
+const ADMIN: PersonaStrategy = {
+  id: PlayerPersonaEnum.admin,
+  canDeal: true,
+  adminControls: true,
+  audienceExtraMembers: 0,
+  createState: createRuntimeState
+}
+
 const PERSONA_STRATEGIES: Record<PlayerPersonaEnum, PersonaStrategy> = {
   [PlayerPersonaEnum.pragmatic]: PRAGMATIC,
   [PlayerPersonaEnum.gambler]: GAMBLER,
@@ -234,7 +242,8 @@ const PERSONA_STRATEGIES: Record<PlayerPersonaEnum, PersonaStrategy> = {
   [PlayerPersonaEnum.closer]: CLOSER,
   [PlayerPersonaEnum.host]: HOST,
   [PlayerPersonaEnum.holdout]: HOLDOUT,
-  [PlayerPersonaEnum.lucky]: LUCKY
+  [PlayerPersonaEnum.lucky]: LUCKY,
+  [PlayerPersonaEnum.admin]: ADMIN
 }
 
 export function getPersonaStrategy(id: PlayerPersonaEnum): PersonaStrategy {

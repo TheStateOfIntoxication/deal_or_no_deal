@@ -1,9 +1,11 @@
 <script lang="ts" setup>
 import { computed } from 'vue'
 import { getGameMode } from '@/config/modes'
+import type { BankerProfileEnum } from '@/config/bankers'
 import type { GameModeDefinition } from '@/config/modes'
 import { PLAYER_PERSONAS } from '@/config/personas'
 import type { GameModeEnum, PlayerPersonaEnum } from '@/types/game'
+import BankerPicker from './BankerPicker.vue'
 import DrawPanel from './DrawPanel.vue'
 import JackpotIntro from './JackpotIntro.vue'
 import ModeCard from './ModeCard.vue'
@@ -17,6 +19,8 @@ const props = defineProps<{
   selectedMode: GameModeEnum | null
   mode: GameModeDefinition | null
   personaId: PlayerPersonaEnum | null
+  bankerId: BankerProfileEnum | null
+  modeFaceUp: boolean
   drawCandidates: number[]
   pickedIndex: number | null
   drawLowestAmount: number
@@ -29,10 +33,13 @@ const emit = defineEmits<{
   (e: 'mode-confirm'): void
   (e: 'persona-pick', id: PlayerPersonaEnum): void
   (e: 'persona-confirm'): void
+  (e: 'banker-pick', id: BankerProfileEnum): void
+  (e: 'banker-confirm'): void
   (e: 'pick', index: number): void
   (e: 'start'): void
 }>()
 
+const isBankerStep = computed(() => props.setupPhase === SetupPhaseEnum.bankerPick)
 const isModeStep = computed(
   () =>
     props.setupPhase === SetupPhaseEnum.modeDraw ||
@@ -41,11 +48,13 @@ const isModeStep = computed(
 const title = computed(() => {
   if (isModeStep.value) return 'SetupModeTitle'
   if (props.setupPhase === SetupPhaseEnum.personaPick) return 'SetupPersonaTitle'
+  if (isBankerStep.value) return 'SetupBankerTitle'
   return props.mode?.nameKey ?? 'SetupModeTitle'
 })
 const hint = computed(() => {
   if (isModeStep.value) return 'SetupModeHint'
   if (props.setupPhase === SetupPhaseEnum.personaPick) return 'SetupPersonaHint'
+  if (isBankerStep.value) return 'SetupBankerHint'
   return props.mode?.descKey ?? 'SetupModeHint'
 })
 const modeOf = (modeId: GameModeEnum): GameModeDefinition => getGameMode(modeId)
@@ -64,9 +73,9 @@ const modeOf = (modeId: GameModeEnum): GameModeDefinition => getGameMode(modeId)
         v-for="(card, index) in modeDeck"
         :key="card.modeId"
         :mode="modeOf(card.modeId)"
-        :revealed="card.revealed"
+        :revealed="card.revealed || props.modeFaceUp"
         :selected="selectedMode === card.modeId"
-        :disabled="setupPhase === SetupPhaseEnum.modeReveal && !card.revealed"
+        :disabled="!props.modeFaceUp && setupPhase === SetupPhaseEnum.modeReveal && !card.revealed"
         @pick="emit('mode-pick', index)"
       />
     </div>
@@ -107,6 +116,13 @@ const modeOf = (modeId: GameModeEnum): GameModeDefinition => getGameMode(modeId)
         </el-button>
       </div>
     </template>
+
+    <BankerPicker
+      v-if="setupPhase === SetupPhaseEnum.bankerPick"
+      :selected="bankerId"
+      @pick="emit('banker-pick', $event)"
+      @confirm="emit('banker-confirm')"
+    />
 
     <template v-if="setupPhase === SetupPhaseEnum.modeSetup">
       <DrawPanel

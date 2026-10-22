@@ -79,6 +79,8 @@ export interface PersonaAdviceContext {
 export interface PersonaStrategy {
   id: PlayerPersonaEnum
   canDeal: boolean
+  /** Enables test-only setup controls (face-up mode cards and banker choice) */
+  adminControls?: boolean
   audienceExtraMembers: number
   audienceRecommendationCount?: number
   createState: () => PersonaRuntimeState

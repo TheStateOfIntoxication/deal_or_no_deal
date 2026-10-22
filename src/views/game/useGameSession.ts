@@ -76,7 +76,9 @@ export interface GameSessionApi {
   setupPhase: Ref<SetupPhaseEnum>
   modeDeck: Ref<ModeCardState[]>
   selectedMode: ComputedRef<GameModeEnum | null>
+  bankerId: Ref<BankerProfileEnum>
   personaId: Ref<PlayerPersonaEnum | null>
+  modeFaceUp: ComputedRef<boolean>
   mode: ComputedRef<GameModeDefinition | null>
   persona: ComputedRef<PlayerPersonaDefinition | null>
   modeLabel: ComputedRef<string>
@@ -118,6 +120,8 @@ export interface GameSessionApi {
   handleModeConfirm: () => void
   handlePersonaPick: (id: PlayerPersonaEnum) => void
   handlePersonaConfirm: () => void
+  handleBankerPick: (id: BankerProfileEnum) => void
+  handleBankerConfirm: () => void
   handlePick: (index: number) => void
   beginGame: (forcedK?: number) => void
   resetDraw: () => void
@@ -137,12 +141,16 @@ export interface GameSessionApi {
  */
 export function useGameSession(): GameSessionApi {
   const sessionSeed = ref<number>(createSeed())
-  const setupPhase = ref<SetupPhaseEnum>(SetupPhaseEnum.modeDraw)
+  const setupPhase = ref<SetupPhaseEnum>(SetupPhaseEnum.personaPick)
   const modeDeck = ref<ModeCardState[]>([])
   /** Reserved for a future multi-mode persona; the current UI keeps exactly one id */
   const selectedModeIds = ref<GameModeEnum[]>([])
   const selectedMode = computed<GameModeEnum | null>(() => selectedModeIds.value[0] ?? null)
   const personaId = ref<PlayerPersonaEnum | null>(null)
+  const isAdmin = computed(
+    () => !!personaId.value && getPersonaStrategy(personaId.value).adminControls === true
+  )
+  const modeFaceUp = computed(() => isAdmin.value)
 
   let engine = new GameEngine(
     createModeGameConfig(GameModeEnum.classic, sessionSeed.value),
@@ -197,6 +205,7 @@ export function useGameSession(): GameSessionApi {
     personaId.value ? getPlayerPersona(personaId.value) : null
   )
   const modeLabel = computed(() => (mode.value ? t(mode.value.nameKey) : ''))
+  const bankerId = bankerProfileId
   const personaLabel = computed(() => (persona.value ? t(persona.value.nameKey) : ''))
   const topPrizeLabel = computed(
     () => `${formatMoney(snapshot.value.topPrize)} ×${snapshot.value.topPrizeRemaining}`
@@ -381,7 +390,7 @@ export function useGameSession(): GameSessionApi {
   const resetDraw = (): void => {
     clearTimers()
     sessionSeed.value = createSeed()
-    setupPhase.value = SetupPhaseEnum.modeDraw
+    setupPhase.value = SetupPhaseEnum.personaPick
     selectedModeIds.value = []
     personaId.value = null
     let deck = buildModeDeck(
@@ -444,8 +453,9 @@ export function useGameSession(): GameSessionApi {
     setupPhase.value = SetupPhaseEnum.modeDraw
   }
 
-  const handleModeConfirm = (): void => {
-    if (!selectedMode.value || setupPhase.value !== SetupPhaseEnum.modeReveal) return
+  /** Rebuild the engine with the chosen mode/banker and enter the mode setup */
+  function enterModeSetup(): void {
+    if (!selectedMode.value) return
     engine = new GameEngine(
       createModeGameConfig(selectedMode.value, sessionSeed.value),
       selectedMode.value,
@@ -455,7 +465,20 @@ export function useGameSession(): GameSessionApi {
     pickedIndex.value = null
     clearError()
     refresh()
-    setupPhase.value = SetupPhaseEnum.personaPick
+    setupPhase.value = SetupPhaseEnum.modeSetup
+    if (mode.value?.setup === 'k-draw') {
+      drawCandidates.value = engine.createKDraw()
+      pickedIndex.value = null
+    }
+  }
+
+  const handleModeConfirm = (): void => {
+    if (!selectedMode.value || setupPhase.value !== SetupPhaseEnum.modeReveal) return
+    if (isAdmin.value) {
+      setupPhase.value = SetupPhaseEnum.bankerPick
+      return
+    }
+    enterModeSetup()
   }
 
   const handlePersonaPick = (id: PlayerPersonaEnum): void => {
@@ -465,18 +488,35 @@ export function useGameSession(): GameSessionApi {
 
   const handlePersonaConfirm = (): void => {
     if (!personaId.value || setupPhase.value !== SetupPhaseEnum.personaPick) return
-    const forcedK = mode.value
-      ? (getPersonaStrategy(personaId.value).getForcedStartK?.(mode.value.id) ?? null)
-      : null
+    const forcedK =
+      getPersonaStrategy(personaId.value).getForcedStartK?.(GameModeEnum.classic) ?? null
     if (forcedK !== null) {
+      selectedModeIds.value = [GameModeEnum.classic]
+      engine = new GameEngine(
+        createModeGameConfig(GameModeEnum.classic, sessionSeed.value),
+        GameModeEnum.classic,
+        bankerProfileId.value
+      )
+      refresh()
       beginGame(forcedK)
       return
     }
-    setupPhase.value = SetupPhaseEnum.modeSetup
-    if (mode.value?.setup === 'k-draw') {
-      drawCandidates.value = engine.createKDraw()
-      pickedIndex.value = null
-    }
+    const strategy = getPersonaStrategy(personaId.value)
+    modeDeck.value = strategy.adminControls
+      ? GAME_MODES.map((item) => ({ modeId: item.id, revealed: false }))
+      : modeDeck.value.map((card) => ({ ...card, revealed: false }))
+    setupPhase.value = SetupPhaseEnum.modeDraw
+  }
+
+  const handleBankerPick = (id: BankerProfileEnum): void => {
+    if (setupPhase.value !== SetupPhaseEnum.bankerPick) return
+    bankerProfileId.value = id
+    nextBankerLine = createBankerLinePicker(bankerProfile.value.lineTone)
+  }
+
+  const handleBankerConfirm = (): void => {
+    if (setupPhase.value !== SetupPhaseEnum.bankerPick) return
+    enterModeSetup()
   }
 
   const handlePick = (index: number): void => {
@@ -741,7 +781,9 @@ export function useGameSession(): GameSessionApi {
     setupPhase,
     modeDeck,
     selectedMode,
+    bankerId,
     personaId,
+    modeFaceUp,
     mode,
     persona,
     modeLabel,
@@ -783,6 +825,8 @@ export function useGameSession(): GameSessionApi {
     handleModeConfirm,
     handlePersonaPick,
     handlePersonaConfirm,
+    handleBankerPick,
+    handleBankerConfirm,
     handlePick,
     beginGame,
     resetDraw,

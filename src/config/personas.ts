@@ -143,6 +143,16 @@ export const PLAYER_PERSONAS: PlayerPersonaDefinition[] = [
     emoji: '🍀',
     tone: 'green',
     difficulty: 1
+  },
+  {
+    id: PlayerPersonaEnum.admin,
+    nameKey: 'PersonaAdminName',
+    traitKey: 'PersonaAdminTrait',
+    adviceDealKey: 'PersonaAdminAdvice',
+    adviceHoldKey: 'PersonaAdminAdvice',
+    emoji: '🛠️',
+    tone: 'blue',
+    difficulty: 1
   }
 ]
 
