@@ -26,6 +26,9 @@ const caseClass = computed(() => {
       <span v-if="stats.revealedAmount !== null" class="player-stage__amount">
         {{ formatMoney(stats.revealedAmount) }}
       </span>
+      <span v-else-if="stats.adminAmount !== null" class="player-stage__admin-amount">
+        {{ formatMoney(stats.adminAmount) }}
+      </span>
       <span v-else class="player-stage__unknown">?</span>
     </div>
 
@@ -137,6 +140,14 @@ const caseClass = computed(() => {
     margin-top: 4px;
     font-size: 18px;
     color: #7b93aa;
+  }
+
+  &__admin-amount {
+    margin-top: 2px;
+    font-size: 12px;
+    font-weight: 700;
+    color: #d8c9ff;
+    font-variant-numeric: tabular-nums;
   }
 
   &__amount {

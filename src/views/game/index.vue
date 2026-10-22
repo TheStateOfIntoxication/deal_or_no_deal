@@ -1,7 +1,6 @@
 <script lang="ts" setup>
 import { computed } from 'vue'
 import AmountBoard from './components/AmountBoard.vue'
-import BankerSpeechBubble from './components/BankerSpeechBubble.vue'
 import GameDialogs from './components/GameDialogs.vue'
 import GameStatusBar from './components/GameStatusBar.vue'
 import GameTable from './components/GameTable.vue'
@@ -38,6 +37,7 @@ const {
   offerVisible,
   swapVisible,
   resultVisible,
+  canReopenResult,
   tableShaking,
   bestPrize,
   flashGrade,
@@ -50,8 +50,11 @@ const {
   rage,
   noDealCount,
   offerMeta,
-  bankerBubble,
-  conspiratorTargetCaseNo,
+  isConspirator,
+  conspiratorAsking,
+  conspiratorAskAvailable,
+  conspiratorAskUsed,
+  conspiratorHints,
   audienceMembers,
   audienceRecommendations,
   audienceReactions,
@@ -67,14 +70,14 @@ const {
   beginGame,
   resetDraw,
   handleSelect,
-  handleCaseHover,
-  handleCaseLeave,
+  handleConspiratorAsk,
   handleDeal,
   handleNoDeal,
   handlePersonaAction,
   handleSideBet,
   handleSwap,
-  dismissResult
+  dismissResult,
+  handleOpenResult
 } = useGameSession()
 
 const playing = computed(() => setupPhase.value === SetupPhaseEnum.playing)
@@ -133,7 +136,9 @@ const dialogState = computed(() => ({
         :persona-label="personaLabel"
         :remaining-cases="snapshot.remainingCaseCount"
         :remaining-to-open="snapshot.remainingToOpen"
+        :can-reopen-result="canReopenResult"
         @restart="resetDraw"
+        @reopen-result="handleOpenResult"
       />
       <p class="game-page__hint">{{ hint }}</p>
       <p v-if="errorText" class="game-page__error">{{ errorText }}</p>
@@ -144,32 +149,29 @@ const dialogState = computed(() => ({
           <AmountBoard :rows="snapshot.amountRows" :last-opened="snapshot.lastOpened" />
         </aside>
         <GameTable
-          :snapshot="snapshot"
-          :grid-cases="gridCases"
-          :banker-expression="bankerExpression"
-          :banker-confidence="bankerConfidence"
-          :rage="rage"
-          :no-deal-count="noDealCount"
-          :banker-line="bankerLine"
-          :banker-name="bankerName"
-          :banker-trait="bankerTrait"
-          :offer-visible="offerVisible"
-          :offer-meta="offerMeta"
+          :snapshot="snapshot" :grid-cases="gridCases"
+          :banker-expression="bankerExpression" :banker-confidence="bankerConfidence"
+          :rage="rage" :no-deal-count="noDealCount"
+          :banker-line="bankerLine" :banker-name="bankerName" :banker-trait="bankerTrait"
+          :offer-visible="offerVisible" :offer-meta="offerMeta"
           :advice-text="adviceText"
           :recommended-case-nos="recommendedCaseNos"
           :audience-members="audienceMembers"
           :audience-recommendations="audienceRecommendations"
           :audience-reactions="audienceReactions"
-          :table-shaking="tableShaking" :hint-case-no="conspiratorTargetCaseNo"
-          @select="handleSelect" @hover="handleCaseHover"
-          @leave="handleCaseLeave"
+          :table-shaking="tableShaking"
+          :is-conspirator="isConspirator"
+          :conspirator-ask-available="conspiratorAskAvailable"
+          :conspirator-ask-used="conspiratorAskUsed"
+          :conspirator-asking="conspiratorAsking"
+          :conspirator-hints="conspiratorHints"
+          @select="handleSelect" @conspirator-ask="handleConspiratorAsk"
           @deal="handleDeal"
           @no-deal="handleNoDeal"
           @persona-action="handlePersonaAction" @side-bet="handleSideBet"
         />
       </main>
       <RoundHistory :logs="snapshot.logs" />
-      <BankerSpeechBubble v-if="bankerBubble" :text="$t(bankerBubble.textKey)" :x="bankerBubble.x" :y="bankerBubble.y" :pinned="bankerBubble.pinned" />
       <GameDialogs
         v-bind="dialogState"
         @swap="handleSwap"

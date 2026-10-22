@@ -2,12 +2,14 @@
 import { computed } from 'vue'
 import { formatMoney } from '@/utils/money'
 import { formatSignedPercent } from '@/utils/percent'
+import type { MessageKey } from '@/language'
 import type { PersonaActionEnum } from '@/types/game'
 import type { AudienceMemberState, AudienceReactionState, AudienceRecommendationState, BankerExpression, BankerOfferMetaState, CaseState, GameSnapshot } from '../types'
 import AudienceRow from './AudienceRow.vue'
 import BankerCard from './BankerCard.vue'
 import BankerSideBet from './BankerSideBet.vue'
 import CaseGrid from './CaseGrid.vue'
+import ConspiratorAsk from './ConspiratorAsk.vue'
 import OfferPanel from './OfferPanel.vue'
 
 const props = defineProps<{
@@ -28,13 +30,16 @@ const props = defineProps<{
   audienceRecommendations: AudienceRecommendationState[]
   audienceReactions: AudienceReactionState[]
   tableShaking: boolean
-  hintCaseNo?: number | null
+  isConspirator: boolean
+  conspiratorAskAvailable: boolean
+  conspiratorAskUsed: boolean
+  conspiratorAsking: boolean
+  conspiratorHints: Record<number, MessageKey>
 }>()
 
 const emit = defineEmits<{
-  (e: 'select', caseNo: number, event?: MouseEvent): void
-  (e: 'hover', caseNo: number, event?: MouseEvent): void
-  (e: 'leave'): void
+  (e: 'select', caseNo: number): void
+  (e: 'conspirator-ask'): void
   (e: 'deal'): void
   (e: 'no-deal'): void
   (e: 'persona-action', action: PersonaActionEnum): void
@@ -59,6 +64,13 @@ const stackBonusText = computed(() =>
       :top-prize="props.snapshot.topPrize"
       :plan="props.offerVisible ? (props.offerMeta?.plan ?? null) : null"
       :quirk-label-key="props.snapshot.bankerState.quirkLabelKey"
+    />
+    <ConspiratorAsk
+      v-if="props.isConspirator"
+      :available="props.conspiratorAskAvailable"
+      :used="props.conspiratorAskUsed"
+      :asking="props.conspiratorAsking"
+      @ask="emit('conspirator-ask')"
     />
     <BankerSideBet
       :side-bet="props.snapshot.bankerState.sideBet"
@@ -101,10 +113,8 @@ const stackBonusText = computed(() =>
       :phase="props.snapshot.phase"
       :remaining-to-open="props.snapshot.remainingToOpen"
       :recommended-case-nos="props.recommendedCaseNos"
-      :hint-case-no="props.hintCaseNo"
-      @select="(caseNo, event) => emit('select', caseNo, event)"
-      @hover="(caseNo, event) => emit('hover', caseNo, event)"
-      @leave="emit('leave')"
+      :hints="props.conspiratorHints"
+      @select="emit('select', $event)"
     />
     <AudienceRow
       :members="props.audienceMembers"

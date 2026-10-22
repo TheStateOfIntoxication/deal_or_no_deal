@@ -11,9 +11,13 @@ const props = defineProps<{
   personaLabel: string
   remainingCases: number
   remainingToOpen: number
+  canReopenResult: boolean
 }>()
 
-const emit = defineEmits<{ (e: 'restart'): void }>()
+const emit = defineEmits<{
+  (e: 'restart'): void
+  (e: 'reopen-result'): void
+}>()
 
 const { muted, toggleMuted } = useAudio()
 const roundProgress = computed(() =>
@@ -54,6 +58,15 @@ const roundProgress = computed(() =>
         @click="toggleMuted"
       >
         {{ muted ? '🔇' : '🔊' }}
+      </el-button>
+      <el-button
+        v-if="canReopenResult"
+        type="warning"
+        plain
+        size="small"
+        @click="emit('reopen-result')"
+      >
+        {{ $t('BtnViewResult') }}
       </el-button>
       <el-button type="warning" plain size="small" @click="emit('restart')">
         {{ $t('BtnRestart') }}

@@ -107,6 +107,8 @@ export interface PlayerCaseStats {
   revealedGrade: PayoutGradeEnum | null
   /** 结算揭晓中（标记未翻牌），用于显示“正在打开”状态 */
   revealing: boolean
+  /** 管理员透视金额；非管理员为 null */
+  adminAmount: number | null
   /** 本局顶奖金额（分） */
   topPrize: number
   /** 玩家箱为顶奖的概率，0–1 */
@@ -195,13 +197,6 @@ export interface AudienceReactionState {
 }
 
 /** 捡漏王被动触发提示 */
-export interface BankerSpeechState {
-  textKey: MessageKey
-  x: number
-  y: number
-  pinned: boolean
-}
-
 export interface PassiveNoticeState {
   personaId: PlayerPersonaEnum
   caseNo: number

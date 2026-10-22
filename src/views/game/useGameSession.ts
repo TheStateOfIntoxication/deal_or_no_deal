@@ -51,7 +51,6 @@ import type {
   AudienceRecommendationState,
   BankerExpression,
   BankerOfferMetaState,
-  BankerSpeechState,
   CaseState,
   GameSnapshot,
   PlayerCaseStats,
@@ -100,6 +99,7 @@ export interface GameSessionApi {
   offerVisible: ComputedRef<boolean>
   swapVisible: ComputedRef<boolean>
   resultVisible: ComputedRef<boolean>
+  canReopenResult: ComputedRef<boolean>
   tableShaking: ComputedRef<boolean>
   bestPrize: ComputedRef<number>
   flashGrade: Ref<AmountGradeEnum | PayoutGradeEnum | null>
@@ -112,8 +112,11 @@ export interface GameSessionApi {
   rage: ComputedRef<number>
   noDealCount: ComputedRef<number>
   offerMeta: ComputedRef<BankerOfferMetaState | null>
-  bankerBubble: Ref<BankerSpeechState | null>
-  conspiratorTargetCaseNo: ComputedRef<number | null>
+  isConspirator: ComputedRef<boolean>
+  conspiratorAsking: Ref<boolean>
+  conspiratorAskAvailable: ComputedRef<boolean>
+  conspiratorAskUsed: ComputedRef<boolean>
+  conspiratorHints: Ref<Record<number, MessageKey>>
   audienceMembers: Ref<AudienceMemberState[]>
   audienceRecommendations: Ref<AudienceRecommendationState[]>
   audienceReactions: Ref<AudienceReactionState[]>
@@ -128,15 +131,15 @@ export interface GameSessionApi {
   handlePick: (index: number) => void
   beginGame: (forcedK?: number) => void
   resetDraw: () => void
-  handleSelect: (caseNo: number, event?: MouseEvent) => void
-  handleCaseHover: (caseNo: number, event?: MouseEvent) => void
-  handleCaseLeave: () => void
+  handleSelect: (caseNo: number) => void
+  handleConspiratorAsk: () => void
   handleDeal: () => void
   handleNoDeal: () => void
   handlePersonaAction: (action: PersonaActionEnum) => void
   handleSideBet: () => void
   handleSwap: (shouldSwap: boolean) => void
   dismissResult: () => void
+  handleOpenResult: () => void
 }
 
 /**
@@ -183,15 +186,14 @@ export function useGameSession(): GameSessionApi {
   const flashTone = ref<AmountTone | null>(null)
   const bankerRotation = new BankerRotation(createSeed())
   let conspiratorRandom = createRandom(deriveSeed(sessionSeed.value, 'conspirator'))
-  const conspiratorHint = ref<{ caseNo: number; textKey: MessageKey } | null>(null)
-  let conspiratorHintShown = false
-  const conspiratorTargetCaseNo = computed(() =>
-    snapshot.value.phase === GamePhaseEnum.opening ? (conspiratorHint.value?.caseNo ?? null) : null
-  )
-  const bankerBubble = ref<BankerSpeechState | null>(null)
-  let bubbleTimer: number | undefined
+  const conspiratorUsedRound = ref(0)
+  const conspiratorAsking = ref(false)
+  const conspiratorHints = ref<Record<number, MessageKey>>({})
   const bankerProfileId = ref<BankerProfileEnum>(BankerProfileEnum.default)
   const bankerProfile = computed(() => getBankerProfile(bankerProfileId.value))
+  const isConspirator = computed(
+    () => bankerProfileId.value === BankerProfileEnum.conspirator
+  )
   let nextBankerLine = createBankerLinePicker()
   const bankerLineKey = ref<MessageKey>('BankerLineGreeting1')
   const meltdownActive = ref(false)
@@ -221,6 +223,17 @@ export function useGameSession(): GameSessionApi {
   )
 
   const phase = computed(() => snapshot.value.phase)
+  const conspiratorAskUsed = computed(
+    () => conspiratorUsedRound.value === snapshot.value.round
+  )
+  const conspiratorAskAvailable = computed(
+    () =>
+      isConspirator.value &&
+      phase.value === GamePhaseEnum.opening &&
+      snapshot.value.remainingToOpen > 0 &&
+      !conspiratorAskUsed.value &&
+      !conspiratorAsking.value
+  )
   const pickedK = computed(() => {
     const index = pickedIndex.value
     return index === null ? null : (drawCandidates.value[index] ?? null)
@@ -237,6 +250,13 @@ export function useGameSession(): GameSessionApi {
   const swapVisible = computed(() => phase.value === GamePhaseEnum.swapPending)
   const resultVisible = computed(
     () => phase.value === GamePhaseEnum.settled && resultReady.value && !resultDismissed.value
+  )
+  const canReopenResult = computed(
+    () =>
+      phase.value === GamePhaseEnum.settled &&
+      resultReady.value &&
+      resultDismissed.value &&
+      snapshot.value.result !== null
   )
   const tableShaking = computed(() => flashGrade.value === AmountGradeEnum.disaster)
   const bestPrize = computed(() => store.state.record.bestPrize)
@@ -261,11 +281,15 @@ export function useGameSession(): GameSessionApi {
   const gridCases = computed(() =>
     snapshot.value.cases
       .filter((item) => !item.isPlayerCase)
-      .map((item) =>
-        hideSettledReveal.value && !item.opened
+      .map((item) => {
+        if (!item.opened && isAdmin.value) {
+          const amount = engine.getCaseAmountForHint(item.no)
+          if (amount !== null) return { ...item, revealedAmount: amount }
+        }
+        return hideSettledReveal.value && !item.opened
           ? { ...item, revealedAmount: null, grade: null }
           : item
-      )
+      })
   )
   const lastOpened = computed(() => snapshot.value.lastOpened)
   const revealVisible = computed(
@@ -297,6 +321,8 @@ export function useGameSession(): GameSessionApi {
       revealedAmount: heldResult ? heldResult.heldCaseAmount : null,
       revealedGrade: heldResult ? heldResult.payoutGrade : null,
       revealing: settled && !finalRevealed.value,
+      adminAmount:
+        isAdmin.value && playerCase ? engine.getCaseAmountForHint(playerCase.no) : null,
       topPrize: snapshot.value.topPrize,
       probability: topPrizeProbability.value,
       topPrizeRemaining: snapshot.value.topPrizeRemaining,
@@ -375,7 +401,6 @@ export function useGameSession(): GameSessionApi {
     window.clearTimeout(revealTimer)
     window.clearTimeout(resultTimer)
     window.clearTimeout(flashTimer)
-    window.clearTimeout(bubbleTimer)
   }
 
   /** 把观众情绪同步给引擎；角色策略决定是否把它转成报价修正 */
@@ -430,10 +455,9 @@ export function useGameSession(): GameSessionApi {
     bankerProfileId.value = bankerRotation.next()
     nextBankerLine = createBankerLinePicker(bankerProfile.value.lineTone)
     conspiratorRandom = createRandom(deriveSeed(sessionSeed.value, 'conspirator'))
-    conspiratorHint.value = null
-    conspiratorHintShown = false
-    bankerBubble.value = null
-    window.clearTimeout(bubbleTimer)
+    conspiratorUsedRound.value = 0
+    conspiratorAsking.value = false
+    conspiratorHints.value = {}
     engine = new GameEngine(
       createModeGameConfig(GameModeEnum.classic, sessionSeed.value),
       GameModeEnum.classic,
@@ -565,10 +589,10 @@ export function useGameSession(): GameSessionApi {
   }
 
   /** 选箱阶段点击即选箱，开箱阶段点击即开箱 */
-  const handleSelect = (caseNo: number, event?: MouseEvent): void => {
+  const handleSelect = (caseNo: number): void => {
     const picking = phase.value === GamePhaseEnum.waitingPlayerCase
-    // If the whisper was not shown on hover, the first click previews it instead of opening.
-    if (!picking && shouldPreviewConspirator(caseNo, event)) return
+    // While the conspirator is waiting for a case, the click selects a whisper target.
+    if (!picking && selectConspiratorHint(caseNo)) return
     const result = picking ? engine.selectPlayerCase(caseNo) : engine.openCase(caseNo)
     if (!result.ok) {
       reject(result.error)
@@ -583,8 +607,7 @@ export function useGameSession(): GameSessionApi {
       return
     }
 
-    if (bankerBubble.value) bankerBubble.value = null
-    refreshConspiratorHint()
+    removeConspiratorHint(caseNo)
 
     const opened = snapshot.value.lastOpened
     if (opened) {
@@ -631,106 +654,45 @@ export function useGameSession(): GameSessionApi {
     [CaseTierEnum.low]: 'BankerLineConspiratorClaimLow'
   }
 
-  /** Pick one unopened, non-player case for the current whisper */
-  const buildConspiratorHint = (): { caseNo: number; textKey: MessageKey } | null => {
-    if (bankerProfile.value.id !== BankerProfileEnum.conspirator) return null
-    const candidates = snapshot.value.cases.filter((item) => !item.opened && !item.isPlayerCase)
-    if (candidates.length === 0) return null
-    const target = candidates[Math.floor(conspiratorRandom.next() * candidates.length)]
-    if (!target) return null
-    const amount = engine.getCaseAmountForHint(target.no)
-    if (amount === null) return null
+  const removeConspiratorHint = (caseNo: number): void => {
+    if (!(caseNo in conspiratorHints.value)) return
+    const next = { ...conspiratorHints.value }
+    delete next[caseNo]
+    conspiratorHints.value = next
+  }
+
+  /** Player picked a case after asking; show its persistent whisper without opening it */
+  const selectConspiratorHint = (caseNo: number): boolean => {
+    if (!conspiratorAsking.value || !isConspirator.value || phase.value !== GamePhaseEnum.opening) {
+      return false
+    }
+    const target = snapshot.value.cases.find((item) => item.no === caseNo)
+    if (!target || target.opened || target.isPlayerCase) return false
+    const amount = engine.getCaseAmountForHint(caseNo)
+    if (amount === null) return false
     const hint = createConspiratorHint(
       amount,
       snapshot.value.amountRows.map((row) => row.amount),
       snapshot.value.topPrize,
       conspiratorRandom
     )
-    return { caseNo: target.no, textKey: CONSPIRATOR_CLAIM_KEYS[hint.claimTier] }
-  }
-
-  const setConspiratorHint = (next: { caseNo: number; textKey: MessageKey } | null): void => {
-    conspiratorHint.value = next
-    conspiratorHintShown = false
-  }
-
-  /** Start a round with exactly one hidden target; it is spoken about before opening. */
-  const startConspiratorRound = (): void => {
-    bankerBubble.value = null
-    setConspiratorHint(null)
-    if (bankerProfile.value.id !== BankerProfileEnum.conspirator) return
-    setConspiratorHint(buildConspiratorHint())
-  }
-
-  const showBankerBubble = (textKey: MessageKey, event: MouseEvent | undefined, pinned: boolean): void => {
-    const width = Math.min(260, Math.max(180, window.innerWidth - 24))
-    const x = Math.max(12, Math.min((event?.clientX ?? window.innerWidth / 2) + 16, window.innerWidth - width - 12))
-    const y = Math.max(12, Math.min((event?.clientY ?? window.innerHeight / 2) - 82, window.innerHeight - 150))
-    bankerBubble.value = { textKey, x, y, pinned }
-    window.clearTimeout(bubbleTimer)
-    if (!pinned) return
-    bubbleTimer = window.setTimeout(() => {
-      if (bankerBubble.value?.pinned) bankerBubble.value = null
-    }, 3000)
-  }
-
-  /** Touch browsers synthesize a mouseenter right before click; ignore it so the tap can preview */
-  const supportsHover = (): boolean =>
-    typeof window.matchMedia !== 'function' || window.matchMedia('(hover: hover)').matches
-
-  /** The first click previews; a hover already displaying the whisper counts as preview */
-  const shouldPreviewConspirator = (caseNo: number, event?: MouseEvent): boolean => {
-    if (
-      bankerProfile.value.id !== BankerProfileEnum.conspirator ||
-      phase.value !== GamePhaseEnum.opening ||
-      conspiratorHintShown
-    ) {
-      return false
-    }
-    const hint = conspiratorHint.value
-    if (!hint || hint.caseNo !== caseNo) return false
-    conspiratorHintShown = true
-    bankerLineKey.value = hint.textKey
-    showBankerBubble(hint.textKey, event, true)
+    const textKey = CONSPIRATOR_CLAIM_KEYS[hint.claimTier]
+    conspiratorHints.value = { ...conspiratorHints.value, [caseNo]: textKey }
+    conspiratorAsking.value = false
+    bankerLineKey.value = textKey
     return true
   }
 
-  /** The hovered target exposes the same whisper before the click */
-  const handleCaseHover = (caseNo: number, event?: MouseEvent): void => {
-    if (
-      !supportsHover() ||
-      bankerProfile.value.id !== BankerProfileEnum.conspirator ||
-      phase.value !== GamePhaseEnum.opening
-    ) {
-      if (bankerBubble.value && !bankerBubble.value.pinned) bankerBubble.value = null
-      return
-    }
-    const hint = conspiratorHint.value
-    if (!hint || hint.caseNo !== caseNo) {
-      if (bankerBubble.value && !bankerBubble.value.pinned) bankerBubble.value = null
-      return
-    }
-    bankerLineKey.value = hint.textKey
-    if (event) {
-      conspiratorHintShown = true
-      showBankerBubble(hint.textKey, event, false)
-    }
+  const handleConspiratorAsk = (): void => {
+    if (!conspiratorAskAvailable.value) return
+    conspiratorUsedRound.value = snapshot.value.round
+    conspiratorAsking.value = true
+    bankerLineKey.value = 'ConspiratorAskPrompt'
   }
 
-  const handleCaseLeave = (): void => {
-    if (bankerBubble.value && !bankerBubble.value.pinned) bankerBubble.value = null
-  }
-
-  const refreshConspiratorHint = (): void => {
-    const hint = conspiratorHint.value
-    if (
-      hint &&
-      snapshot.value.cases.some((item) => item.no === hint.caseNo && item.opened)
-    ) {
-      // One whisper per round: do not pick a new target after the first is opened.
-      setConspiratorHint(null)
-    }
-    if (bankerBubble.value && !bankerBubble.value.pinned) bankerBubble.value = null
+  /** A new round clears the question prompt; previous case hints persist until end of game */
+  const startConspiratorRound = (): void => {
+    conspiratorAsking.value = false
   }
 
   const handleDeal = (): void => {
@@ -810,6 +772,10 @@ export function useGameSession(): GameSessionApi {
     resultDismissed.value = true
   }
 
+  const handleOpenResult = (): void => {
+    if (canReopenResult.value) resultDismissed.value = false
+  }
+
   /** 阶段节奏：一轮开完先亮金额再出报价；结算先留念再翻牌，翻牌后才出结算面板 */
   watch(phase, (value) => {
     window.clearTimeout(holdTimer)
@@ -820,7 +786,6 @@ export function useGameSession(): GameSessionApi {
     resultReady.value = false
     resultDismissed.value = false
     flashTone.value = null
-    bankerBubble.value = null
 
     if (value === GamePhaseEnum.offerPending) {
       holdTimer = window.setTimeout(() => {
@@ -916,8 +881,11 @@ export function useGameSession(): GameSessionApi {
     rage,
     noDealCount,
     offerMeta,
-    bankerBubble,
-    conspiratorTargetCaseNo,
+    isConspirator,
+    conspiratorAsking,
+    conspiratorAskAvailable,
+    conspiratorAskUsed,
+    conspiratorHints,
     audienceMembers,
     audienceRecommendations,
     audienceReactions,
@@ -933,13 +901,14 @@ export function useGameSession(): GameSessionApi {
     beginGame,
     resetDraw,
     handleSelect,
-    handleCaseHover,
-    handleCaseLeave,
+    handleConspiratorAsk,
     handleDeal,
     handleNoDeal,
     handlePersonaAction,
     handleSideBet,
     handleSwap,
-    dismissResult
+    dismissResult,
+    canReopenResult,
+    handleOpenResult
   }
 }

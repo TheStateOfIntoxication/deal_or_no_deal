@@ -1,4 +1,6 @@
 <script lang="ts" setup>
+import { t } from '@/language'
+import type { MessageKey } from '@/language'
 import { formatMoney } from '@/utils/money'
 import { AmountGradeEnum } from '@/types/game'
 import { GamePhaseEnum } from '../types'
@@ -9,13 +11,11 @@ const props = defineProps<{
   phase: GamePhaseEnum
   remainingToOpen: number
   recommendedCaseNos?: number[]
-  hintCaseNo?: number | null
+  hints?: Record<number, MessageKey>
 }>()
 
 const emit = defineEmits<{
-  (e: 'select', caseNo: number, event?: MouseEvent): void
-  (e: 'hover', caseNo: number, event?: MouseEvent): void
-  (e: 'leave'): void
+  (e: 'select', caseNo: number): void
 }>()
 
 /** 当前阶段该箱子是否不可点击（R-5.2.1–R-5.2.3、R-11.3） */
@@ -25,6 +25,12 @@ const isDisabled = (item: CaseState): boolean => {
   return item.opened || props.remainingToOpen === 0
 }
 
+/** 管理员透视和阴谋家低语都只影响展示，不改箱子状态 */
+const hintTextFor = (caseNo: number): string => {
+  const key = props.hints?.[caseNo]
+  return key ? t(key) : ''
+}
+
 /** 开箱档位决定金额配色，让不同金额的反馈一眼可辨 */
 const caseClass = (item: CaseState): Record<string, boolean> => {
   const classes: Record<string, boolean> = { 'case-grid__case--opened': item.opened }
@@ -32,8 +38,8 @@ const caseClass = (item: CaseState): Record<string, boolean> => {
   if (!item.opened && props.recommendedCaseNos?.includes(item.no)) {
     classes['case-grid__case--recommended'] = true
   }
-  if (!item.opened && props.hintCaseNo === item.no) {
-    classes['case-grid__case--whisper'] = true
+  if (!item.opened && props.hints?.[item.no]) {
+    classes['case-grid__case--hinted'] = true
   }
   return classes
 }
@@ -47,14 +53,15 @@ const caseClass = (item: CaseState): Record<string, boolean> => {
         class="case-grid__case"
         :class="caseClass(item)"
         :disabled="isDisabled(item)"
-        @mouseenter="emit('hover', item.no, $event)"
-        @mouseleave="emit('leave')"
-        @focus="emit('hover', item.no)"
-        @click="emit('select', item.no, $event)"
+        @click="emit('select', item.no)"
       >
         <span class="case-grid__no">{{ item.no }}</span>
         <span v-if="item.revealedAmount !== null" class="case-grid__amount">
           {{ formatMoney(item.revealedAmount) }}
+        </span>
+        <span v-if="hintTextFor(item.no)" class="case-grid__whisper">
+          {{ hintTextFor(item.no) }}
+          <small>{{ $t('BankerConspiratorTapAgain') }}</small>
         </span>
         <span
           v-if="item.opened && item.grade === AmountGradeEnum.disaster"
@@ -117,22 +124,9 @@ const caseClass = (item: CaseState): Record<string, boolean> => {
       box-shadow: 0 0 0 2px #f2c14e55, 0 0 20px #f2c14e33;
     }
 
-    &--whisper {
+    &--hinted {
+      z-index: 4;
       border-color: #b79cff;
-      box-shadow: 0 0 0 1px #b79cff55, 0 0 18px #b79cff33;
-
-      &::after {
-        content: '';
-        position: absolute;
-        top: 6px;
-        right: 6px;
-        width: 5px;
-        height: 5px;
-        border-radius: 50%;
-        background: #b79cff;
-        box-shadow: 0 0 8px #b79cff;
-        animation: whisper-pulse 1.4s ease-in-out infinite;
-      }
     }
 
     &--good {
@@ -192,6 +186,41 @@ const caseClass = (item: CaseState): Record<string, boolean> => {
     color: var(--dond-danger);
   }
 
+  &__whisper {
+    position: absolute;
+    bottom: calc(100% + 7px);
+    left: 50%;
+    z-index: 5;
+    width: 156px;
+    padding: 7px 8px;
+    border: 1px solid #b79cff;
+    border-radius: 10px 10px 10px 3px;
+    font-size: 10px;
+    line-height: 1.45;
+    color: #e7ddff;
+    text-align: left;
+    white-space: normal;
+    background: linear-gradient(135deg, #241d3e 0%, #111c31 100%);
+    box-shadow: 0 8px 22px #00000088, 0 0 18px #b79cff33;
+    pointer-events: none;
+    transform: translateX(-50%);
+
+    &::after {
+      content: '';
+      position: absolute;
+      bottom: -7px;
+      left: 14px;
+      border-top: 8px solid #111c31;
+      border-right: 8px solid transparent;
+    }
+
+    small {
+      display: block;
+      margin-top: 3px;
+      color: #b79cff;
+    }
+  }
+
   &__recommend {
     position: absolute;
     bottom: -7px;
@@ -204,12 +233,6 @@ const caseClass = (item: CaseState): Record<string, boolean> => {
     color: #08131f;
     background: var(--dond-gold);
     transform: translateX(-50%);
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .case-grid__case--whisper::after {
-      animation: none;
-    }
   }
 
   @media (max-width: 1200px) {
@@ -225,14 +248,4 @@ const caseClass = (item: CaseState): Record<string, boolean> => {
   }
 }
 
-@keyframes whisper-pulse {
-  0%,
-  100% {
-    opacity: 0.45;
-  }
-
-  50% {
-    opacity: 1;
-  }
-}
 </style>

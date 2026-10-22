@@ -115,8 +115,6 @@ async function pickAndOpenFirstRound(wrapper: ReturnType<typeof mount>): Promise
   expect(wrapper.find('.player-stage__no').text()).toBe('#1')
 
   for (const button of wrapper.findAll('.case-grid__case').slice(0, 6)) {
-    // Real mouse input fires hover first; this also marks a conspirator whisper as shown.
-    await button.trigger('mouseenter')
     await button.trigger('click')
   }
   await wrapper.vm.$nextTick()
