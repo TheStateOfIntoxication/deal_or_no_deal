@@ -8,8 +8,8 @@ export enum CaseTierEnum {
   low = 'low'
 }
 
-/** Every round has one whisper; this share is truthful, the rest are lies */
-export const CONSPIRATOR_TRUTH_CHANCE = 0.6
+/** A case gets one whisper roll; this share is truthful, the rest are lies */
+export const CONSPIRATOR_TRUTH_CHANCE = 0.5
 
 export interface ConspiratorHint {
   trueTier: CaseTierEnum

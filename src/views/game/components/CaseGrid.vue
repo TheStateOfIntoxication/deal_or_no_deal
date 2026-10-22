@@ -1,4 +1,5 @@
 <script lang="ts" setup>
+import { ref, watch } from 'vue'
 import { t } from '@/language'
 import type { MessageKey } from '@/language'
 import { formatMoney } from '@/utils/money'
@@ -18,6 +19,8 @@ const emit = defineEmits<{
   (e: 'select', caseNo: number): void
 }>()
 
+const hoveredCaseNo = ref<number | null>(null)
+
 /** 当前阶段该箱子是否不可点击（R-5.2.1–R-5.2.3、R-11.3） */
 const isDisabled = (item: CaseState): boolean => {
   if (props.phase === GamePhaseEnum.waitingPlayerCase) return false
@@ -30,6 +33,18 @@ const hintTextFor = (caseNo: number): string => {
   const key = props.hints?.[caseNo]
   return key ? t(key) : ''
 }
+
+const showHint = (caseNo: number): boolean =>
+  hoveredCaseNo.value === caseNo && !!props.hints?.[caseNo]
+
+// Make a newly selected hint visible once (important on touch, where there is no hover).
+watch(
+  () => props.hints,
+  (next, previous) => {
+    const added = Object.keys(next ?? {}).find((key) => !previous?.[Number(key)])
+    if (added) hoveredCaseNo.value = Number(added)
+  }
+)
 
 /** 开箱档位决定金额配色，让不同金额的反馈一眼可辨 */
 const caseClass = (item: CaseState): Record<string, boolean> => {
@@ -53,13 +68,17 @@ const caseClass = (item: CaseState): Record<string, boolean> => {
         class="case-grid__case"
         :class="caseClass(item)"
         :disabled="isDisabled(item)"
+        @mouseenter="hoveredCaseNo = item.no"
+        @mouseleave="hoveredCaseNo = null"
+        @focus="hoveredCaseNo = item.no"
+        @blur="hoveredCaseNo = null"
         @click="emit('select', item.no)"
       >
         <span class="case-grid__no">{{ item.no }}</span>
         <span v-if="item.revealedAmount !== null" class="case-grid__amount">
           {{ formatMoney(item.revealedAmount) }}
         </span>
-        <span v-if="hintTextFor(item.no)" class="case-grid__whisper">
+        <span v-if="showHint(item.no)" class="case-grid__whisper">
           {{ hintTextFor(item.no) }}
           <small>{{ $t('BankerConspiratorTapAgain') }}</small>
         </span>

@@ -668,6 +668,13 @@ export function useGameSession(): GameSessionApi {
     }
     const target = snapshot.value.cases.find((item) => item.no === caseNo)
     if (!target || target.opened || target.isPlayerCase) return false
+    const existing = conspiratorHints.value[caseNo]
+    if (existing) {
+      // Never reroll a case: repeated questions must not improve the truth odds.
+      conspiratorAsking.value = false
+      bankerLineKey.value = existing
+      return true
+    }
     const amount = engine.getCaseAmountForHint(caseNo)
     if (amount === null) return false
     const hint = createConspiratorHint(
