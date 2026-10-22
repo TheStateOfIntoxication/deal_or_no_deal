@@ -1,7 +1,7 @@
 <script lang="ts" setup>
 import { computed } from 'vue'
 import { t } from '@/language'
-import { useAudio } from '@/utils/useAudio'
+import { useAudio } from '../useAudio'
 
 const props = defineProps<{
   round: number

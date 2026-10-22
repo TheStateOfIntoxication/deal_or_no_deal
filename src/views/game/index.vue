@@ -2,7 +2,7 @@
 import AmountBoard from './components/AmountBoard.vue'
 import BankerCard from './components/BankerCard.vue'
 import CaseGrid from './components/CaseGrid.vue'
-import DrawPanel from './components/DrawPanel.vue'
+import DrawScene from './components/DrawScene.vue'
 import GameStatusBar from './components/GameStatusBar.vue'
 import OfferPanel from './components/OfferPanel.vue'
 import PlayerCaseStage from './components/PlayerCaseStage.vue'
@@ -50,18 +50,16 @@ const {
 
 <template>
   <div class="game-page" :class="{ 'game-page--drawing': drawing }">
-    <template v-if="drawing">
-      <p v-if="errorText" class="game-page__error">{{ errorText }}</p>
-      <DrawPanel
-        :visible="true"
-        :candidates="drawCandidates"
-        :picked-index="pickedIndex"
-        :lowest-amount="drawLowestAmount"
-        :top-prize="topPrize"
-        @pick="handlePick"
-        @start="beginGame"
-      />
-    </template>
+    <DrawScene
+      v-if="drawing"
+      :error-text="errorText"
+      :candidates="drawCandidates"
+      :picked-index="pickedIndex"
+      :lowest-amount="drawLowestAmount"
+      :top-prize="topPrize"
+      @pick="handlePick"
+      @start="beginGame"
+    />
 
     <template v-else>
       <GameStatusBar

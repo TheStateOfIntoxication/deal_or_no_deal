@@ -47,6 +47,7 @@ const payoutText = computed(() =>
       <h2 class="result-dialog__title">{{ $t('ResultTitle') }}</h2>
     </template>
     <template v-if="result">
+      <p class="result-dialog__prize-label">{{ $t('ResultPrize') }}</p>
       <p class="result-dialog__prize">{{ formatMoney(result.prize) }}</p>
       <p class="result-dialog__badge" :class="`result-dialog__badge--${result.payoutGrade}`">
         {{ payoutText }}
@@ -92,6 +93,14 @@ const payoutText = computed(() =>
     font-size: 18px;
     letter-spacing: 2px;
     color: var(--dond-gold);
+  }
+
+  &__prize-label {
+    margin-top: 4px;
+    font-size: 11px;
+    letter-spacing: 2px;
+    text-align: center;
+    color: var(--dond-text-dim);
   }
 
   &__prize {

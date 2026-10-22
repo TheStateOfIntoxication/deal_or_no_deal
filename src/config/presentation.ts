@@ -46,3 +46,6 @@ export const FEAR_MAX = 0.08
 /** Effective multiplier stays inside these bounds so the offer never beats the mean */
 export const OFFER_MULTIPLIER_MIN = 0
 export const OFFER_MULTIPLIER_MAX = 1
+
+/** Banker confidence at or above which his offer line is the cocky variant */
+export const OFFER_CONFIDENT_CONFIDENCE = 0.7

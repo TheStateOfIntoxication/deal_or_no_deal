@@ -144,6 +144,15 @@ describe('游戏页冒烟', () => {
     expect(wrapper.findAll('.offer-panel__chip')).toHaveLength(6)
     expect(wrapper.find('.player-stage__chance-value').text()).toMatch(/\d+\.\d%/)
 
+    // 音效开关走 Vuex settings，并可持久化
+    const soundButton = wrapper.findAll('.status-bar__actions button')[0]
+    await soundButton?.trigger('click')
+    await wrapper.vm.$nextTick()
+    expect(store.state.settings.muted).toBe(true)
+    await soundButton?.trigger('click')
+    await wrapper.vm.$nextTick()
+    expect(store.state.settings.muted).toBe(false)
+
     // 银行家常驻卡：初始怒气 0
     expect(wrapper.find('.banker-card').exists()).toBe(true)
     expect(wrapper.find('.banker-card__rage-value').text()).toBe('0')

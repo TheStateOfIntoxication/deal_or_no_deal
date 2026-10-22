@@ -1,4 +1,4 @@
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import type { ComputedRef, Ref } from 'vue'
 import { createGameConfig } from '@/config/game'
 import {
@@ -7,6 +7,7 @@ import {
   MILESTONE_HALF,
   MILESTONE_HIGH,
   MILESTONE_LOW,
+  OFFER_CONFIDENT_CONFIDENCE,
   RAGE_TIER_ANGRY,
   RAGE_TIER_ANNOYED,
   RAGE_TIER_FURIOUS,
@@ -18,7 +19,7 @@ import type { MessageKey, MessageParams } from '@/language'
 import { useStore } from '@/store'
 import { AmountGradeEnum, PayoutGradeEnum } from '@/types/game'
 import { formatMoney } from '@/utils/money'
-import { useAudio } from '@/utils/useAudio'
+import { useAudio } from './useAudio'
 import { createBankerLinePicker } from './bankerLines'
 import type { BankerEvent } from './bankerLines'
 import { GameEngine } from './services/GameEngine'
@@ -90,7 +91,13 @@ export function useGameSession(): GameSessionApi {
   const engine = new GameEngine(gameConfig)
   const snapshot = ref<GameSnapshot>(engine.getSnapshot())
   const errorKey = ref<MessageKey | null>(null)
-  const errorParams = ref<MessageParams>({})
+  const errorParams = reactive<MessageParams>({})
+
+  /** 清空错误提示与占位参数 */
+  const clearError = (): void => {
+    errorKey.value = null
+    for (const key of Object.keys(errorParams)) delete errorParams[key]
+  }
   const store = useStore()
   const { playOpen, playOffer, playGrade, playPayout, playDraw } = useAudio()
 
@@ -212,7 +219,7 @@ export function useGameSession(): GameSessionApi {
         return t('HintChoosePlayerCase')
     }
   })
-  const errorText = computed(() => (errorKey.value ? t(errorKey.value, errorParams.value) : ''))
+  const errorText = computed(() => (errorKey.value ? t(errorKey.value, errorParams) : ''))
 
   const refresh = (): void => {
     snapshot.value = engine.getSnapshot()
@@ -220,7 +227,8 @@ export function useGameSession(): GameSessionApi {
 
   const reject = (error: EngineErrorEnum, params: MessageParams = {}): void => {
     errorKey.value = ERROR_KEYS[error]
-    errorParams.value = params
+    for (const key of Object.keys(errorParams)) delete errorParams[key]
+    Object.assign(errorParams, params)
   }
 
   const pickBankerLine = (event: BankerEvent): void => {
@@ -255,8 +263,7 @@ export function useGameSession(): GameSessionApi {
     pickedIndex.value = null
     drawCandidates.value = engine.createKDraw()
     drawing.value = true
-    errorKey.value = null
-    errorParams.value = {}
+    clearError()
     refresh()
   }
 
@@ -276,8 +283,7 @@ export function useGameSession(): GameSessionApi {
       reject(result.error, { codes: engine.getConfigErrors().join(', ') })
       return
     }
-    errorKey.value = null
-    errorParams.value = {}
+    clearError()
     drawing.value = false
     pickBankerLine('greeting')
   }
@@ -290,7 +296,7 @@ export function useGameSession(): GameSessionApi {
       reject(result.error)
       return
     }
-    errorKey.value = null
+    clearError()
     refresh()
     if (picking) {
       playOpen()
@@ -320,7 +326,7 @@ export function useGameSession(): GameSessionApi {
 
   const handleDeal = (): void => {
     if (!engine.deal().ok) return
-    errorKey.value = null
+    clearError()
     refresh()
     persistResult()
     pickBankerLine('deal')
@@ -332,7 +338,7 @@ export function useGameSession(): GameSessionApi {
       reject(result.error)
       return
     }
-    errorKey.value = null
+    clearError()
     refresh()
     if (phase.value === GamePhaseEnum.settled) {
       persistResult()
@@ -349,7 +355,7 @@ export function useGameSession(): GameSessionApi {
 
   const handleSwap = (shouldSwap: boolean): void => {
     if (!engine.swap(shouldSwap).ok) return
-    errorKey.value = null
+    clearError()
     refresh()
     persistResult()
   }
@@ -374,7 +380,7 @@ export function useGameSession(): GameSessionApi {
         offerReady.value = true
         playOffer()
         pickBankerLine(
-          snapshot.value.bankerConfidence >= 0.7 ? 'offerConfident' : 'offerNervous'
+          snapshot.value.bankerConfidence >= OFFER_CONFIDENT_CONFIDENCE ? 'offerConfident' : 'offerNervous'
         )
       }, REVEAL_HOLD_MS)
       return

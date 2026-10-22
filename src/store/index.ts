@@ -1,11 +1,13 @@
 import { createStore, useStore as useVuexStore } from 'vuex'
 import type { Store } from 'vuex'
 import recordModule from './modules/record'
+import settingsModule from './modules/settings'
 import type { RootStateTypes } from './types'
 
 const store = createStore<RootStateTypes>({
   modules: {
-    record: recordModule
+    record: recordModule,
+    settings: settingsModule
   }
 })
 

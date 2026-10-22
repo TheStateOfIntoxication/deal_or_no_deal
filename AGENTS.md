@@ -13,7 +13,7 @@
 | UI 库 | Element Plus 2.14（`el-*`，按需自动导入：`unplugin-vue-components` + `unplugin-auto-import`） |
 | 语言 | TypeScript 5.9（`strict: true`） |
 | 样式 | SCSS（`<style lang="scss" scoped>`） |
-| 状态 | Vuex 4：仅 `record`（战绩）模块；单局游戏状态在 `views/game` 组件内 |
+| 状态 | Vuex 4：`record`（战绩）+ `settings`（音效开关）；单局游戏状态在 `views/game` 组件内 |
 | 路由 | Vue Router 4（hash 模式） |
 | HTTP | 无后端、无 HTTP 调用（不引入 Axios / `utils/fetch`） |
 | 构建 | Vite 7 |
@@ -31,7 +31,9 @@
 ## 本项目约定（按需）
 
 - 金额：一律以**分**为整数存算（`R-8.1`）。仅报价乘数/均方根允许临时浮点，最终 `floor` 到分并在取整后复校边界（`R-8.5`）
-- 配置分层：规则参数只放 `src/config/game.ts`，表现层参数（分级阈值、揭示时长、概率里程碑）只放 `src/config/presentation.ts`
+- 表现层参数（分级阈值、揭示时长、概率里程碑、台词信心阈值）一律只放 `src/config/presentation.ts`，业务逻辑里禁止硬编码
+- 有限状态优先用 enum（`00-vue3.md` §8.4）；`DecidedByType`（deal/case/certainty）按 §8.3 以字符串联合表达，登记为例外
+- 提交：默认只 `git commit`，不执行 `git push`（由人手动推送）；作者邮箱沿用当前仓库配置
 - 报价：9 次，第 9 轮报价即最终报价；终局不再出价（`R-5.3.5`、`R-7.1.1`）
 - 国际化：`src/language/{zh,en}`，Key 扁平、字母序、中英严格一致；模板用 `$t`，脚本用 `t()`
 - Element Plus 采用按需自动导入（`vite.config.ts` 内的 `ElementPlusResolver`），生成的 `src/types/components.d.ts`、`src/types/auto-imports.d.ts` 不得手改；`tsconfig.types` 保留 `element-plus/global`
