@@ -9,6 +9,7 @@ const props = defineProps<{
   phase: GamePhaseEnum
   remainingToOpen: number
   recommendedCaseNos?: number[]
+  hintCaseNo?: number | null
 }>()
 
 const emit = defineEmits<{
@@ -30,6 +31,9 @@ const caseClass = (item: CaseState): Record<string, boolean> => {
   if (item.opened && item.grade) classes[`case-grid__case--${item.grade}`] = true
   if (!item.opened && props.recommendedCaseNos?.includes(item.no)) {
     classes['case-grid__case--recommended'] = true
+  }
+  if (!item.opened && props.hintCaseNo === item.no) {
+    classes['case-grid__case--whisper'] = true
   }
   return classes
 }
@@ -113,6 +117,24 @@ const caseClass = (item: CaseState): Record<string, boolean> => {
       box-shadow: 0 0 0 2px #f2c14e55, 0 0 20px #f2c14e33;
     }
 
+    &--whisper {
+      border-color: #b79cff;
+      box-shadow: 0 0 0 1px #b79cff55, 0 0 18px #b79cff33;
+
+      &::after {
+        content: '';
+        position: absolute;
+        top: 6px;
+        right: 6px;
+        width: 5px;
+        height: 5px;
+        border-radius: 50%;
+        background: #b79cff;
+        box-shadow: 0 0 8px #b79cff;
+        animation: whisper-pulse 1.4s ease-in-out infinite;
+      }
+    }
+
     &--good {
       border-color: #35c48c;
       background: #0d2a22;
@@ -184,6 +206,12 @@ const caseClass = (item: CaseState): Record<string, boolean> => {
     transform: translateX(-50%);
   }
 
+  @media (prefers-reduced-motion: reduce) {
+    .case-grid__case--whisper::after {
+      animation: none;
+    }
+  }
+
   @media (max-width: 1200px) {
     grid-template-columns: repeat(6, minmax(0, 1fr));
   }
@@ -194,6 +222,17 @@ const caseClass = (item: CaseState): Record<string, boolean> => {
 
   @media (max-width: 640px) {
     grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@keyframes whisper-pulse {
+  0%,
+  100% {
+    opacity: 0.45;
+  }
+
+  50% {
+    opacity: 1;
   }
 }
 </style>

@@ -3,6 +3,7 @@ const props = defineProps<{
   text: string
   x: number
   y: number
+  pinned?: boolean
 }>()
 </script>
 
@@ -14,6 +15,7 @@ const props = defineProps<{
   >
     <span class="banker-speech__speaker">{{ $t('BankerConspiratorName') }}</span>
     <p class="banker-speech__line">{{ props.text }}</p>
+    <p v-if="props.pinned" class="banker-speech__retry">{{ $t('BankerConspiratorTapAgain') }}</p>
     <span class="banker-speech__tail" aria-hidden="true" />
   </aside>
 </template>
@@ -46,6 +48,11 @@ const props = defineProps<{
     font-size: 12px;
     line-height: 1.5;
     color: var(--dond-text);
+  }
+
+  &__retry {
+    font-size: 10px;
+    color: #b79cff;
   }
 
   &__tail {

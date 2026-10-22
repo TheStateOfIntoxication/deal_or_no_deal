@@ -51,6 +51,7 @@ const {
   noDealCount,
   offerMeta,
   bankerBubble,
+  conspiratorTargetCaseNo,
   audienceMembers,
   audienceRecommendations,
   audienceReactions,
@@ -159,7 +160,7 @@ const dialogState = computed(() => ({
           :audience-members="audienceMembers"
           :audience-recommendations="audienceRecommendations"
           :audience-reactions="audienceReactions"
-          :table-shaking="tableShaking"
+          :table-shaking="tableShaking" :hint-case-no="conspiratorTargetCaseNo"
           @select="handleSelect" @hover="handleCaseHover"
           @leave="handleCaseLeave"
           @deal="handleDeal"
@@ -168,7 +169,7 @@ const dialogState = computed(() => ({
         />
       </main>
       <RoundHistory :logs="snapshot.logs" />
-      <BankerSpeechBubble v-if="bankerBubble" :text="$t(bankerBubble.textKey)" :x="bankerBubble.x" :y="bankerBubble.y" />
+      <BankerSpeechBubble v-if="bankerBubble" :text="$t(bankerBubble.textKey)" :x="bankerBubble.x" :y="bankerBubble.y" :pinned="bankerBubble.pinned" />
       <GameDialogs
         v-bind="dialogState"
         @swap="handleSwap"

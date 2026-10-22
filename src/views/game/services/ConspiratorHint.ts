@@ -8,9 +8,7 @@ export enum CaseTierEnum {
   low = 'low'
 }
 
-/** First eligible hover of a round has this chance to trigger a whisper */
-export const CONSPIRATOR_HINT_CHANCE = 0.35
-/** When triggered, this share is truthful; the rest are lies */
+/** Every round has one whisper; this share is truthful, the rest are lies */
 export const CONSPIRATOR_TRUTH_CHANCE = 0.6
 
 export interface ConspiratorHint {
@@ -35,16 +33,15 @@ function claimTierOf(trueTier: CaseTierEnum, random: RandomSource): CaseTierEnum
 }
 
 /**
- * Roll a whisper. Returns null when it does not trigger.
- * A lie always claims a different tier, so a "top" claim is not guaranteed true.
+ * Roll the round's whisper. A lie always claims a different tier,
+ * so a "top" claim is not guaranteed true.
  */
 export function createConspiratorHint(
   amount: number,
   pool: readonly number[],
   topPrize: number,
   random: RandomSource
-): ConspiratorHint | null {
-  if (random.next() >= CONSPIRATOR_HINT_CHANCE) return null
+): ConspiratorHint {
   const trueTier = caseTierOf(amount, pool, topPrize)
   const truthful = random.next() < CONSPIRATOR_TRUTH_CHANCE
   return {
