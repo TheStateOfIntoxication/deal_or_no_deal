@@ -1,6 +1,7 @@
 <script lang="ts" setup>
 import { computed } from 'vue'
 import AmountBoard from './components/AmountBoard.vue'
+import BankerSpeechBubble from './components/BankerSpeechBubble.vue'
 import GameDialogs from './components/GameDialogs.vue'
 import GameStatusBar from './components/GameStatusBar.vue'
 import GameTable from './components/GameTable.vue'
@@ -49,6 +50,7 @@ const {
   rage,
   noDealCount,
   offerMeta,
+  bankerBubble,
   audienceMembers,
   audienceRecommendations,
   audienceReactions,
@@ -65,6 +67,7 @@ const {
   resetDraw,
   handleSelect,
   handleCaseHover,
+  handleCaseLeave,
   handleDeal,
   handleNoDeal,
   handlePersonaAction,
@@ -118,8 +121,7 @@ const dialogState = computed(() => ({
       @mode-confirm="handleModeConfirm"
       @persona-pick="handlePersonaPick"
       @persona-confirm="handlePersonaConfirm" @banker-pick="handleBankerPick" @banker-confirm="handleBankerConfirm"
-      @pick="handlePick"
-      @start="beginGame"
+      @pick="handlePick" @start="beginGame"
     />
     <template v-else>
       <GameStatusBar
@@ -158,14 +160,15 @@ const dialogState = computed(() => ({
           :audience-recommendations="audienceRecommendations"
           :audience-reactions="audienceReactions"
           :table-shaking="tableShaking"
-          @select="handleSelect"
-          @hover="handleCaseHover"
+          @select="handleSelect" @hover="handleCaseHover"
+          @leave="handleCaseLeave"
           @deal="handleDeal"
           @no-deal="handleNoDeal"
           @persona-action="handlePersonaAction" @side-bet="handleSideBet"
         />
       </main>
       <RoundHistory :logs="snapshot.logs" />
+      <BankerSpeechBubble v-if="bankerBubble" :text="$t(bankerBubble.textKey)" :x="bankerBubble.x" :y="bankerBubble.y" />
       <GameDialogs
         v-bind="dialogState"
         @swap="handleSwap"

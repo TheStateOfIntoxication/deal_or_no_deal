@@ -195,6 +195,13 @@ export interface AudienceReactionState {
 }
 
 /** 捡漏王被动触发提示 */
+export interface BankerSpeechState {
+  textKey: MessageKey
+  x: number
+  y: number
+  pinned: boolean
+}
+
 export interface PassiveNoticeState {
   personaId: PlayerPersonaEnum
   caseNo: number

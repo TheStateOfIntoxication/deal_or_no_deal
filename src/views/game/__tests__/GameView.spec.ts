@@ -148,7 +148,7 @@ describe('游戏页冒烟', () => {
     await wrapper.vm.$nextTick()
 
     // 开局阶段：先选角色，再进入玩法卡；此时还没有箱池
-    expect(wrapper.findAll('.persona-card')).toHaveLength(10)
+    expect(wrapper.find('.persona-carousel').exists()).toBe(true)
     expect(wrapper.findAll('.mode-card')).toHaveLength(0)
     expect(wrapper.find('.case-grid__case').exists()).toBe(false)
 
@@ -249,7 +249,7 @@ describe('游戏页冒烟', () => {
     expect(restartButton).toBeDefined()
     await new DOMWrapper(restartButton as HTMLElement).trigger('click')
     await wrapper.vm.$nextTick()
-    expect(wrapper.findAll('.persona-card')).toHaveLength(10)
+    expect(wrapper.find('.persona-carousel').exists()).toBe(true)
     expect(wrapper.find('.case-grid__case').exists()).toBe(false)
 
     wrapper.unmount()

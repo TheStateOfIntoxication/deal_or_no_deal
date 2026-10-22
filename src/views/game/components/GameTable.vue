@@ -31,8 +31,9 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  (e: 'select', caseNo: number): void
-  (e: 'hover', caseNo: number): void
+  (e: 'select', caseNo: number, event?: MouseEvent): void
+  (e: 'hover', caseNo: number, event?: MouseEvent): void
+  (e: 'leave'): void
   (e: 'deal'): void
   (e: 'no-deal'): void
   (e: 'persona-action', action: PersonaActionEnum): void
@@ -99,8 +100,9 @@ const stackBonusText = computed(() =>
       :phase="props.snapshot.phase"
       :remaining-to-open="props.snapshot.remainingToOpen"
       :recommended-case-nos="props.recommendedCaseNos"
-      @select="emit('select', $event)"
-      @hover="emit('hover', $event)"
+      @select="(caseNo, event) => emit('select', caseNo, event)"
+      @hover="(caseNo, event) => emit('hover', caseNo, event)"
+      @leave="emit('leave')"
     />
     <AudienceRow
       :members="props.audienceMembers"

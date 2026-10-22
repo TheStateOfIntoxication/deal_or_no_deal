@@ -12,8 +12,9 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  (e: 'select', caseNo: number): void
-  (e: 'hover', caseNo: number): void
+  (e: 'select', caseNo: number, event?: MouseEvent): void
+  (e: 'hover', caseNo: number, event?: MouseEvent): void
+  (e: 'leave'): void
 }>()
 
 /** 当前阶段该箱子是否不可点击（R-5.2.1–R-5.2.3、R-11.3） */
@@ -42,9 +43,10 @@ const caseClass = (item: CaseState): Record<string, boolean> => {
         class="case-grid__case"
         :class="caseClass(item)"
         :disabled="isDisabled(item)"
-        @mouseenter="emit('hover', item.no)"
+        @mouseenter="emit('hover', item.no, $event)"
+        @mouseleave="emit('leave')"
         @focus="emit('hover', item.no)"
-        @click="emit('select', item.no)"
+        @click="emit('select', item.no, $event)"
       >
         <span class="case-grid__no">{{ item.no }}</span>
         <span v-if="item.revealedAmount !== null" class="case-grid__amount">

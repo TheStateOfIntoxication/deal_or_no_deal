@@ -9,7 +9,7 @@ import BankerPicker from './BankerPicker.vue'
 import DrawPanel from './DrawPanel.vue'
 import JackpotIntro from './JackpotIntro.vue'
 import ModeCard from './ModeCard.vue'
-import PersonaCard from './PersonaCard.vue'
+import PersonaCarousel from './PersonaCarousel.vue'
 import { SetupPhaseEnum } from '../types'
 import type { ModeCardState } from '../services/ModeDeckBuilder'
 
@@ -96,15 +96,12 @@ const modeOf = (modeId: GameModeEnum): GameModeDefinition => getGameMode(modeId)
     </div>
 
     <template v-if="setupPhase === SetupPhaseEnum.personaPick">
-      <div class="setup__personas">
-        <PersonaCard
-          v-for="item in PLAYER_PERSONAS"
-          :key="item.id"
-          :persona="item"
-          :selected="personaId === item.id"
-          @pick="emit('persona-pick', item.id)"
-        />
-      </div>
+      <PersonaCarousel
+        :personas="PLAYER_PERSONAS"
+        :selected-id="personaId"
+        @pick="emit('persona-pick', $event)"
+        @confirm="emit('persona-confirm')"
+      />
       <div class="setup__actions">
         <el-button
           type="warning"
@@ -216,17 +213,6 @@ const modeOf = (modeId: GameModeEnum): GameModeDefinition => getGameMode(modeId)
     justify-content: center;
   }
 
-  &__personas {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 14px;
-    width: 100%;
-  }
 }
 
-@media (max-width: 720px) {
-  .setup__personas {
-    grid-template-columns: minmax(0, 1fr);
-  }
-}
 </style>
