@@ -58,3 +58,6 @@ export const AUDIENCE_GUILT_SHARE = 0.9
 export const AUDIENCE_MOOD_MIN = 0
 export const AUDIENCE_MOOD_MAX = 5
 export const AUDIENCE_MOOD_START = 3
+
+/** Gambler: offers auto-skip because No Deal is not selectable */
+export const GAMBLER_AUTO_NO_DEAL_MS = 3000

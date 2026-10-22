@@ -45,6 +45,7 @@ const {
   noDealCount,
   offerMeta,
   audienceMembers,
+  autoNoDealSeconds,
   audienceRecommendations,
   audienceReactions,
   recommendedCaseNos,
@@ -115,7 +116,7 @@ const dialogState = computed(() => ({
       <main class="game-page__main">
         <aside class="game-page__side">
           <PlayerCaseStage :stats="playerCaseStats" />
-          <AmountBoard :rows="snapshot.amountRows" />
+          <AmountBoard :rows="snapshot.amountRows" :last-opened="snapshot.lastOpened" />
         </aside>
         <GameTable
           :snapshot="snapshot"
@@ -132,6 +133,7 @@ const dialogState = computed(() => ({
           :audience-members="audienceMembers"
           :audience-recommendations="audienceRecommendations"
           :audience-reactions="audienceReactions"
+          :auto-no-deal-seconds="autoNoDealSeconds"
           :table-shaking="tableShaking"
           @select="handleSelect"
           @deal="handleDeal"

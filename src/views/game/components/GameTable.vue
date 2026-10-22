@@ -20,6 +20,7 @@ const props = defineProps<{
   audienceMembers: AudienceMemberState[]
   audienceRecommendations: AudienceRecommendationState[]
   audienceReactions: AudienceReactionState[]
+  autoNoDealSeconds: number
   tableShaking: boolean
 }>()
 
@@ -53,8 +54,8 @@ const emit = defineEmits<{
       :round-opened="props.snapshot.roundOpened"
       :breakdown="props.offerMeta?.breakdown ?? null"
       :plan="props.offerMeta?.plan ?? null"
-      :deal-locked="props.snapshot.dealLocked"
       :no-deal-locked="props.snapshot.noDealLocked"
+      :auto-no-deal-seconds="props.autoNoDealSeconds"
       @deal="emit('deal')"
       @no-deal="emit('no-deal')"
     />

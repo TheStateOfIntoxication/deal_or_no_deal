@@ -2,8 +2,8 @@ import { createGameConfig, TOTAL_ROUNDS } from '@/config/game'
 import type { GameConfig } from '@/config/game'
 import {
   CONFORMIST_AUDIENCE_CAP,
-  GAMBLER_BONUS_RATE,
-  GAMBLER_DEAL_LOCK_ROUNDS,
+  GAMBLER_CONSOLATION_RATE,
+  GAMBLER_TOP_MULTIPLIER,
   PRAGMATIC_GREED_THRESHOLD,
   PRAGMATIC_MAX_PENALTIES,
   PRAGMATIC_PENALTY
@@ -192,7 +192,8 @@ export class GameEngine {
     const entry: RoundOpenedState = {
       caseNo: target.no,
       amount,
-      grade: AmountGrader.gradeOf(amount, state.pool)
+      grade: AmountGrader.gradeOf(amount, state.pool),
+      poolIndex: target.poolIndex
     }
     state.roundOpened.push(entry)
     state.lastOpened = entry
@@ -208,10 +209,6 @@ export class GameEngine {
     if (state.phase !== GamePhaseEnum.offerPending || state.currentOffer === null) {
       return GameEngine.reject(EngineErrorEnum.wrongPhase)
     }
-    if (state.personaId === PlayerPersonaEnum.gambler && state.round <= GAMBLER_DEAL_LOCK_ROUNDS) {
-      return GameEngine.reject(EngineErrorEnum.personaLocked)
-    }
-
     const others = this.unopenedOtherCases()
     const playerAmount = this.playerCaseAmount()
     this.finishWithPrize(
@@ -231,11 +228,6 @@ export class GameEngine {
     const state = this.state
     if (state.phase === GamePhaseEnum.settled) return GameEngine.reject(EngineErrorEnum.gameOver)
     if (state.phase !== GamePhaseEnum.offerPending) return GameEngine.reject(EngineErrorEnum.wrongPhase)
-    // 赌徒锁定到第 9 轮；第 9 轮最后报价必须接受，No Deal 不可用
-    if (state.personaId === PlayerPersonaEnum.gambler && state.round === TOTAL_ROUNDS) {
-      return GameEngine.reject(EngineErrorEnum.noDealLocked)
-    }
-
     // 稳重的“贪心惩罚”：拒绝明显高于期望的报价，下一轮会被压价
     const ev = OfferCalculator.arithmeticMean(this.remainingAmounts())
     if (
@@ -324,14 +316,9 @@ export class GameEngine {
       cases,
       amountRows,
       currentOffer: state.currentOffer,
-      dealLocked:
-        state.phase === GamePhaseEnum.offerPending &&
-        state.personaId === PlayerPersonaEnum.gambler &&
-        state.round <= GAMBLER_DEAL_LOCK_ROUNDS,
       noDealLocked:
         state.phase === GamePhaseEnum.offerPending &&
-        state.personaId === PlayerPersonaEnum.gambler &&
-        state.round === TOTAL_ROUNDS,
+        state.personaId === PlayerPersonaEnum.gambler,
       remainingAmounts: unopenedCases.map((item) => this.amountOf(item)),
       remainingCaseCount: unopenedCases.length,
       topPrize: this.config.topPrize,
@@ -435,15 +422,19 @@ export class GameEngine {
     otherCaseAmount: number | null
   ): void {
     const state = this.state
-    const personaBonus =
-      state.personaId === PlayerPersonaEnum.gambler
-        ? Math.floor(basePrize * GAMBLER_BONUS_RATE)
-        : 0
+    const isGamblerFinal =
+      state.personaId === PlayerPersonaEnum.gambler && decidedBy !== 'deal'
+    const prize = isGamblerFinal
+      ? basePrize === this.config.topPrize
+        ? Math.floor(basePrize * GAMBLER_TOP_MULTIPLIER)
+        : Math.floor(basePrize * GAMBLER_CONSOLATION_RATE)
+      : basePrize
+    const personaBonus = prize - basePrize
     state.result = {
       basePrize,
       personaBonus,
-      prize: basePrize + personaBonus,
-      payoutGrade: AmountGrader.payoutGradeOf(basePrize, state.pool, this.config.topPrize),
+      prize,
+      payoutGrade: AmountGrader.payoutGradeOf(prize, state.pool, this.config.topPrize),
       decidedBy,
       swapped,
       heldCaseNo,

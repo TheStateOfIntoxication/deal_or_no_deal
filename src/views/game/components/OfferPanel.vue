@@ -14,8 +14,8 @@ const props = defineProps<{
   roundOpened: RoundOpenedState[]
   breakdown: OfferBreakdownState | null
   plan: BankerPlanState | null
-  dealLocked: boolean
   noDealLocked: boolean
+  autoNoDealSeconds: number
 }>()
 
 const emit = defineEmits<{ (e: 'deal'): void; (e: 'noDeal'): void }>()
@@ -59,13 +59,7 @@ const audienceText = computed(() => formatSignedPercent(props.breakdown?.audienc
         <strong class="offer-panel__amount">{{ formatMoney(offer) }}</strong>
       </div>
       <div class="offer-panel__actions">
-        <el-button
-          type="danger"
-          size="large"
-          :disabled="dealLocked"
-          :title="dealLocked ? $t('OfferDealLocked') : ''"
-          @click="emit('deal')"
-        >
+        <el-button type="danger" size="large" @click="emit('deal')">
           {{ $t('BtnDeal') }}
         </el-button>
         <el-button
@@ -90,6 +84,9 @@ const audienceText = computed(() => formatSignedPercent(props.breakdown?.audienc
       </span>
       <span v-if="plan && plan.delta !== 0" class="offer-panel__tag offer-panel__tag--plan">
         {{ $t(BANKER_PLAN_LABEL_KEYS[plan.id]) }} {{ planText }}
+      </span>
+      <span v-if="autoNoDealSeconds > 0" class="offer-panel__tag offer-panel__tag--auto">
+        {{ $t('OfferAutoNoDeal', { seconds: autoNoDealSeconds }) }}
       </span>
       <span
         v-if="breakdown && breakdown.persona !== 0"
@@ -233,6 +230,12 @@ const audienceText = computed(() => formatSignedPercent(props.breakdown?.audienc
       color: #7ee2b8;
       background: #35c48c22;
       box-shadow: inset 0 0 0 1px #35c48c66;
+    }
+
+    &--auto {
+      color: #ffd9dd;
+      background: #e35d6a33;
+      box-shadow: inset 0 0 0 1px #e35d6a66;
     }
   }
 

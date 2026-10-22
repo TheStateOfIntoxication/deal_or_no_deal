@@ -36,8 +36,6 @@ export enum EngineErrorEnum {
   caseAlreadyOpened = 'caseAlreadyOpened',
   playerCaseForbidden = 'playerCaseForbidden',
   openQuotaReached = 'openQuotaReached',
-  personaLocked = 'personaLocked',
-  noDealLocked = 'noDealLocked',
   gameOver = 'gameOver'
 }
 
@@ -57,6 +55,8 @@ export interface RoundOpenedState {
   caseNo: number
   amount: number
   grade: AmountGradeEnum
+  /** 对应金额板的行 id，用于“刚刚开出”高亮 */
+  poolIndex: number
 }
 
 /** 金额板的一行：多重集中的一项（R-9.5、R-9.6） */
@@ -77,7 +77,7 @@ export interface RoundLogState {
 export interface GameResultState {
   /** 箱内金额 / 报价原始金额（未含角色加成） */
   basePrize: number
-  /** 角色加成（赌徒 15%，其他角色 0） */
+  /** 角色修正（赌徒终局可正可负；其他角色 0） */
   personaBonus: number
   /** 到手奖金 = basePrize + personaBonus */
   prize: number
@@ -197,9 +197,7 @@ export interface GameSnapshot {
   cases: CaseState[]
   amountRows: AmountRowState[]
   currentOffer: number | null
-  /** 赌徒锁定：前 8 轮不能 Deal */
-  dealLocked: boolean
-  /** 赌徒第 9 轮锁定：最后报价必须接受，No Deal 不可用 */
+  /** 赌徒：No Deal 不可选，报价自动跳过 */
   noDealLocked: boolean
   /** 未打开箱子对应的金额多重集，含玩家箱（R-6.1.1、R-9.5） */
   remainingAmounts: number[]

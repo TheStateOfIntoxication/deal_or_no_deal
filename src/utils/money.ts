@@ -10,3 +10,9 @@ export function formatMoney(cents: number): string {
   const fraction = safe % CENTS_PER_UNIT
   return `$${whole.toLocaleString('en-US')}.${String(fraction).padStart(2, '0')}`
 }
+
+/** Format a signed amount, e.g. -$1.00 for a penalty */
+export function formatSignedMoney(cents: number): string {
+  const safe = Math.trunc(cents)
+  return `${safe < 0 ? '−' : ''}${formatMoney(Math.abs(safe))}`
+}

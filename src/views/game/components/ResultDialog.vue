@@ -3,7 +3,7 @@ import { computed } from 'vue'
 import { t } from '@/language'
 import type { MessageKey } from '@/language'
 import { PayoutGradeEnum } from '@/types/game'
-import { formatMoney } from '@/utils/money'
+import { formatMoney, formatSignedMoney } from '@/utils/money'
 import type { GameResultState } from '../types'
 
 const PAYOUT_KEYS: Record<PayoutGradeEnum, MessageKey> = {
@@ -66,13 +66,13 @@ const payoutText = computed(() =>
           <dt>{{ $t('ResultOtherCaseAmount') }}</dt>
           <dd>{{ formatMoney(result.otherCaseAmount) }}</dd>
         </div>
-        <div v-if="result.personaBonus > 0">
+        <div v-if="result.personaBonus !== 0">
           <dt>{{ $t('ResultBasePrize') }}</dt>
           <dd>{{ formatMoney(result.basePrize) }}</dd>
         </div>
-        <div v-if="result.personaBonus > 0">
+        <div v-if="result.personaBonus !== 0">
           <dt>{{ $t('ResultPersonaBonus') }}</dt>
-          <dd>+{{ formatMoney(result.personaBonus) }}</dd>
+          <dd>{{ formatSignedMoney(result.personaBonus) }}</dd>
         </div>
         <div>
           <dt>{{ $t('LabelSwap') }}</dt>

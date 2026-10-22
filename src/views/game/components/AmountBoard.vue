@@ -1,9 +1,12 @@
 <script lang="ts" setup>
 import { computed } from 'vue'
 import { formatMoney } from '@/utils/money'
-import type { AmountRowState } from '../types'
+import type { AmountRowState, RoundOpenedState } from '../types'
 
-const props = defineProps<{ rows: AmountRowState[] }>()
+const props = defineProps<{
+  rows: AmountRowState[]
+  lastOpened: RoundOpenedState | null
+}>()
 
 /** 金额板按金额升序排列：左列低额、右列高额（R-9.6） */
 const sortedRows = computed(() =>
@@ -14,12 +17,20 @@ const sortedRows = computed(() =>
 <template>
   <section class="amount-board">
     <h2 class="amount-board__title">{{ $t('AmountBoardTitle') }}</h2>
+    <p v-if="lastOpened" class="amount-board__last">
+      <span>{{ $t('LabelJustOpened') }}</span>
+      <strong>#{{ lastOpened.caseNo }}</strong>
+      <span>{{ formatMoney(lastOpened.amount) }}</span>
+    </p>
     <ul class="amount-board__list">
       <li
         v-for="row in sortedRows"
         :key="row.id"
         class="amount-board__row"
-        :class="{ 'amount-board__row--out': row.eliminated }"
+        :class="{
+          'amount-board__row--out': row.eliminated,
+          'amount-board__row--just-opened': lastOpened?.poolIndex === row.id
+        }"
       >
         {{ formatMoney(row.amount) }}
       </li>
@@ -49,6 +60,23 @@ const sortedRows = computed(() =>
     gap: 3px 8px;
   }
 
+  &__last {
+    display: flex;
+    gap: 6px;
+    align-items: baseline;
+    justify-content: center;
+    margin-bottom: 6px;
+    padding: 3px 6px;
+    border-radius: 6px;
+    font-size: 11px;
+    color: var(--dond-text-dim);
+    background: #f2c14e1a;
+
+    strong {
+      color: var(--dond-gold);
+    }
+  }
+
   &__row {
     padding: 3px 8px;
     border-radius: 4px;
@@ -62,6 +90,28 @@ const sortedRows = computed(() =>
       text-decoration: line-through;
       background: transparent;
     }
+
+    &--just-opened {
+      color: #08131f;
+      background: var(--dond-gold);
+      box-shadow: 0 0 0 2px #f2c14e66, 0 0 14px #f2c14e55;
+      animation: amount-board-pop 0.45s ease-out;
+      text-decoration: none;
+    }
   }
 }
 </style>
+
+@keyframes amount-board-pop {
+  0% {
+    transform: scale(1);
+  }
+
+  45% {
+    transform: scale(1.06);
+  }
+
+  100% {
+    transform: scale(1);
+  }
+}

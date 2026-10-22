@@ -13,10 +13,9 @@ export interface PlayerPersonaDefinition {
   difficulty: number
 }
 
-/** Gambler cannot deal before this round; round 9 is the final offer */
-export const GAMBLER_DEAL_LOCK_ROUNDS = 8
-/** Gambler final prize bonus, floored to cents */
-export const GAMBLER_BONUS_RATE = 0.15
+/** Final case: top prize pays 1.5×, other amounts pay 10% */
+export const GAMBLER_TOP_MULTIPLIER = 1.5
+export const GAMBLER_CONSOLATION_RATE = 0.1
 /** Pragmatic is punished for rejecting an offer at/above this share of EV */
 export const PRAGMATIC_GREED_THRESHOLD = 0.8
 /** Pragmatic next-offer penalty when punished */
@@ -45,8 +44,8 @@ export const PLAYER_PERSONAS: PlayerPersonaDefinition[] = [
     id: PlayerPersonaEnum.gambler,
     nameKey: 'PersonaGamblerName',
     traitKey: 'PersonaGamblerTrait',
-    adviceDealKey: 'PersonaGamblerFinal',
-    adviceHoldKey: 'PersonaGamblerLocked',
+    adviceDealKey: 'PersonaGamblerAdvice',
+    adviceHoldKey: 'PersonaGamblerAdvice',
     emoji: '🎲',
     tone: 'red',
     difficulty: 3
