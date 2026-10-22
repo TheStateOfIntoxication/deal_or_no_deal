@@ -62,14 +62,17 @@ const caseClass = (item: CaseState): Record<string, boolean> => {
 
 <template>
   <ul class="case-grid">
-    <li v-for="item in cases" :key="item.no">
+    <li
+      v-for="item in cases"
+      :key="item.no"
+      @mouseenter="hoveredCaseNo = item.no"
+      @mouseleave="hoveredCaseNo = null"
+    >
       <button
         type="button"
         class="case-grid__case"
         :class="caseClass(item)"
         :disabled="isDisabled(item)"
-        @mouseenter="hoveredCaseNo = item.no"
-        @mouseleave="hoveredCaseNo = null"
         @focus="hoveredCaseNo = item.no"
         @blur="hoveredCaseNo = null"
         @click="emit('select', item.no)"
@@ -146,6 +149,7 @@ const caseClass = (item: CaseState): Record<string, boolean> => {
     &--hinted {
       z-index: 4;
       border-color: #b79cff;
+      opacity: 1;
     }
 
     &--good {
