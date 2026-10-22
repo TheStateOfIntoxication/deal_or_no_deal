@@ -1,9 +1,10 @@
 <script lang="ts" setup>
 import { computed } from 'vue'
 import { formatMoney } from '@/utils/money'
-import { formatPercent } from '@/utils/percent'
+import { formatPercent, formatSignedPercent } from '@/utils/percent'
 import type { AmountGradeEnum } from '@/types/game'
-import type { RoundOpenedState } from '../types'
+import { BANKER_PLAN_LABEL_KEYS } from '../bankerLines'
+import type { BankerPlanState, OfferBreakdownState, RoundOpenedState } from '../types'
 
 const props = defineProps<{
   visible: boolean
@@ -11,8 +12,10 @@ const props = defineProps<{
   offer: number
   remainingAmounts: number[]
   roundOpened: RoundOpenedState[]
-  fear: number
-  ragePenalty: number
+  breakdown: OfferBreakdownState | null
+  plan: BankerPlanState | null
+  dealLocked: boolean
+  noDealLocked: boolean
 }>()
 
 const emit = defineEmits<{ (e: 'deal'): void; (e: 'noDeal'): void }>()
@@ -30,8 +33,13 @@ const chipClass = (grade: AmountGradeEnum): Record<string, boolean> => ({
   [`offer-panel__chip--${grade}`]: true
 })
 
-const fearText = computed(() => formatPercent(props.fear))
-const ragePenaltyText = computed(() => formatPercent(props.ragePenalty))
+const fear = computed(() => props.breakdown?.fear ?? 0)
+const ragePenalty = computed(() => props.breakdown?.rage ?? 0)
+const fearText = computed(() => formatPercent(fear.value))
+const ragePenaltyText = computed(() => formatPercent(ragePenalty.value))
+const planText = computed(() => formatSignedPercent(props.plan?.delta ?? 0))
+const personaText = computed(() => formatSignedPercent(props.breakdown?.persona ?? 0))
+const audienceText = computed(() => formatSignedPercent(props.breakdown?.audience ?? 0))
 </script>
 
 <template>
@@ -51,10 +59,22 @@ const ragePenaltyText = computed(() => formatPercent(props.ragePenalty))
         <strong class="offer-panel__amount">{{ formatMoney(offer) }}</strong>
       </div>
       <div class="offer-panel__actions">
-        <el-button type="danger" size="large" @click="emit('deal')">
+        <el-button
+          type="danger"
+          size="large"
+          :disabled="dealLocked"
+          :title="dealLocked ? $t('OfferDealLocked') : ''"
+          @click="emit('deal')"
+        >
           {{ $t('BtnDeal') }}
         </el-button>
-        <el-button type="primary" size="large" @click="emit('noDeal')">
+        <el-button
+          type="primary"
+          size="large"
+          :disabled="noDealLocked"
+          :title="noDealLocked ? $t('OfferNoDealLocked') : ''"
+          @click="emit('noDeal')"
+        >
           {{ $t('BtnNoDeal') }}
         </el-button>
       </div>
@@ -67,6 +87,21 @@ const ragePenaltyText = computed(() => formatPercent(props.ragePenalty))
       </span>
       <span v-if="ragePenalty > 0" class="offer-panel__tag offer-panel__tag--rage">
         {{ $t('BankerAdjustRage', { percent: ragePenaltyText }) }}
+      </span>
+      <span v-if="plan && plan.delta !== 0" class="offer-panel__tag offer-panel__tag--plan">
+        {{ $t(BANKER_PLAN_LABEL_KEYS[plan.id]) }} {{ planText }}
+      </span>
+      <span
+        v-if="breakdown && breakdown.persona !== 0"
+        class="offer-panel__tag offer-panel__tag--persona"
+      >
+        {{ $t('BankerAdjustPersona', { percent: personaText }) }}
+      </span>
+      <span
+        v-if="breakdown && breakdown.audience !== 0"
+        class="offer-panel__tag offer-panel__tag--audience"
+      >
+        {{ $t('BankerAdjustAudience', { percent: audienceText }) }}
       </span>
       <span v-if="roundOpened.length > 0" class="offer-panel__opened">
         <span class="offer-panel__opened-label">{{ $t('LabelRoundOpened') }}</span>
@@ -181,6 +216,23 @@ const ragePenaltyText = computed(() => formatPercent(props.ragePenalty))
       color: #ffd9dd;
       background: #e35d6a33;
       box-shadow: inset 0 0 0 1px #e35d6a66;
+    }
+
+    &--plan {
+      color: #08131f;
+      background: #e08b3a;
+    }
+
+    &--persona {
+      color: #d8c9ff;
+      background: #b79cff26;
+      box-shadow: inset 0 0 0 1px #b79cff66;
+    }
+
+    &--audience {
+      color: #7ee2b8;
+      background: #35c48c22;
+      box-shadow: inset 0 0 0 1px #35c48c66;
     }
   }
 

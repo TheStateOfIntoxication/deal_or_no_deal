@@ -1,4 +1,5 @@
 import type { MessageKey } from '@/language'
+import { BankerPlanEnum } from '@/types/game'
 
 /** 银行家台词触发事件 */
 export type BankerEvent =
@@ -13,6 +14,11 @@ export type BankerEvent =
   | 'gloat'
   | 'annoyedSmall'
   | 'meltdown'
+  | 'planSteady'
+  | 'planLowball'
+  | 'planRebate'
+  | 'planGenerous'
+  | 'planFinalPush'
 
 /** 事件 → 文案 Key 池；同一事件随机取一条，且不连续重复 */
 const LINE_POOLS: Record<BankerEvent, MessageKey[]> = {
@@ -34,7 +40,30 @@ const LINE_POOLS: Record<BankerEvent, MessageKey[]> = {
   deal: ['BankerLineDeal1', 'BankerLineDeal2'],
   gloat: ['BankerLineGloat1', 'BankerLineGloat2'],
   annoyedSmall: ['BankerLineAnnoyed1', 'BankerLineAnnoyed2'],
-  meltdown: ['BankerLineMeltdown1', 'BankerLineMeltdown2']
+  meltdown: ['BankerLineMeltdown1', 'BankerLineMeltdown2'],
+  planSteady: ['BankerLinePlanSteady1', 'BankerLinePlanSteady2'],
+  planLowball: ['BankerLinePlanLowball1', 'BankerLinePlanLowball2'],
+  planRebate: ['BankerLinePlanRebate1', 'BankerLinePlanRebate2'],
+  planGenerous: ['BankerLinePlanGenerous1', 'BankerLinePlanGenerous2'],
+  planFinalPush: ['BankerLinePlanFinalPush1', 'BankerLinePlanFinalPush2']
+}
+
+/** 计划 → 台词事件 */
+export const BANKER_PLAN_EVENTS: Record<BankerPlanEnum, BankerEvent> = {
+  [BankerPlanEnum.steady]: 'planSteady',
+  [BankerPlanEnum.lowball]: 'planLowball',
+  [BankerPlanEnum.rebate]: 'planRebate',
+  [BankerPlanEnum.generous]: 'planGenerous',
+  [BankerPlanEnum.finalPush]: 'planFinalPush'
+}
+
+/** 计划 → 徽章文案 Key */
+export const BANKER_PLAN_LABEL_KEYS: Record<BankerPlanEnum, MessageKey> = {
+  [BankerPlanEnum.steady]: 'BankerPlanSteady',
+  [BankerPlanEnum.lowball]: 'BankerPlanLowball',
+  [BankerPlanEnum.rebate]: 'BankerPlanRebate',
+  [BankerPlanEnum.generous]: 'BankerPlanGenerous',
+  [BankerPlanEnum.finalPush]: 'BankerPlanFinalPush'
 }
 
 /** 创建一个台词选择器：同一事件内随机、且避免与上一条重复 */

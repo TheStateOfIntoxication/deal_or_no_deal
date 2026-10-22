@@ -1,4 +1,21 @@
+import type { MessageKey } from '@/language'
+import {
+  AudienceReactionEnum,
+  AudienceTraitEnum,
+  BankerPlanEnum,
+  GameModeEnum,
+  PlayerPersonaEnum
+} from '@/types/game'
 import type { AmountGradeEnum, DecidedByType, PayoutGradeEnum } from '@/types/game'
+
+/** 开局准备阶段 */
+export enum SetupPhaseEnum {
+  modeDraw = 'modeDraw',
+  modeReveal = 'modeReveal',
+  personaPick = 'personaPick',
+  modeSetup = 'modeSetup',
+  playing = 'playing'
+}
 
 /** 游戏阶段（R-5、R-7） */
 export enum GamePhaseEnum {
@@ -19,6 +36,8 @@ export enum EngineErrorEnum {
   caseAlreadyOpened = 'caseAlreadyOpened',
   playerCaseForbidden = 'playerCaseForbidden',
   openQuotaReached = 'openQuotaReached',
+  personaLocked = 'personaLocked',
+  noDealLocked = 'noDealLocked',
   gameOver = 'gameOver'
 }
 
@@ -56,7 +75,11 @@ export interface RoundLogState {
 
 /** 结算结果 */
 export interface GameResultState {
-  /** 到手奖金：Deal 为报价金额，终局为持有箱金额 */
+  /** 箱内金额 / 报价原始金额（未含角色加成） */
+  basePrize: number
+  /** 角色加成（赌徒 15%，其他角色 0） */
+  personaBonus: number
+  /** 到手奖金 = basePrize + personaBonus */
   prize: number
   /** 到手奖金的展示档位 */
   payoutGrade: PayoutGradeEnum
@@ -92,6 +115,32 @@ export interface PlayerCaseStats {
 /** 银行家表情档位 */
 export type BankerExpression = 'smug' | 'annoyed' | 'angry' | 'furious'
 
+/** 报价时各来源的乘数修正，供界面逐项展示 */
+export interface OfferBreakdownState {
+  /** 本轮基础乘数 */
+  base: number
+  /** 恐惧加价（正数） */
+  fear: number
+  /** 怒气压价幅度（正数） */
+  rage: number
+  /** 银行家计划增量（可正可负） */
+  plan: number
+  /** 角色增量（可正可负） */
+  persona: number
+  /** 观众增量（可正可负） */
+  audience: number
+  /** 最终生效乘数 */
+  effective: number
+  /** 是否因边界被钳制 */
+  clamped: boolean
+}
+
+/** 银行家本轮计划 */
+export interface BankerPlanState {
+  id: BankerPlanEnum
+  delta: number
+}
+
 /** 报价时的银行家修正（均以乘数增量表示，可正可负） */
 export interface BankerOfferMetaState {
   /** 因顶奖概率高而加价（正数） */
@@ -100,12 +149,47 @@ export interface BankerOfferMetaState {
   ragePenalty: number
   /** 报价时的银行家信心 = 1 − p */
   confidence: number
+  /** 逐项修正明细 */
+  breakdown: OfferBreakdownState
+  /** 本轮计划，无计划时为 null */
+  plan: BankerPlanState | null
+}
+
+/** 观众成员 */
+export interface AudienceMemberState {
+  id: number
+  nameKey: MessageKey
+  emoji: string
+  trait: AudienceTraitEnum
+  /** 0–5 */
+  mood: number
+}
+
+/** 本轮观众推荐 */
+export interface AudienceRecommendationState {
+  memberId: number
+  caseNo: number
+}
+
+/** 开箱后观众反应 */
+export interface AudienceReactionState {
+  memberId: number
+  caseNo: number
+  kind: AudienceReactionEnum
+  lineKey: MessageKey
 }
 
 /** 供界面渲染的只读快照 */
 export interface GameSnapshot {
   phase: GamePhaseEnum
+  /** 本局玩法 */
+  modeId: GameModeEnum
+  /** 本局角色 */
+  personaId: PlayerPersonaEnum
+  /** 顶奖数量（经典 = k，巨奖 = 1） */
   k: number
+  /** 顶奖数量别名，新代码优先使用 */
+  topPrizeCount: number
   round: number
   totalRounds: number
   remainingToOpen: number
@@ -113,6 +197,10 @@ export interface GameSnapshot {
   cases: CaseState[]
   amountRows: AmountRowState[]
   currentOffer: number | null
+  /** 赌徒锁定：前 8 轮不能 Deal */
+  dealLocked: boolean
+  /** 赌徒第 9 轮锁定：最后报价必须接受，No Deal 不可用 */
+  noDealLocked: boolean
   /** 未打开箱子对应的金额多重集，含玩家箱（R-6.1.1、R-9.5） */
   remainingAmounts: number[]
   /** 未打开的箱子数（含玩家箱） */

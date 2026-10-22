@@ -6,7 +6,9 @@ import { useAudio } from '../useAudio'
 const props = defineProps<{
   round: number
   totalRounds: number
-  millionCount: number
+  topPrizeLabel: string
+  modeLabel: string
+  personaLabel: string
   remainingCases: number
   remainingToOpen: number
 }>()
@@ -24,6 +26,8 @@ const roundProgress = computed(() =>
     <div class="status-bar__brand">
       <h1 class="status-bar__title">{{ $t('GameTitle') }}</h1>
       <span class="status-bar__subtitle">{{ $t('GameSubtitle') }}</span>
+      <span class="status-bar__badge">{{ modeLabel }}</span>
+      <span class="status-bar__badge status-bar__badge--persona">{{ personaLabel }}</span>
     </div>
     <dl class="status-bar__stats">
       <div class="status-bar__stat">
@@ -35,8 +39,8 @@ const roundProgress = computed(() =>
         <dd>{{ remainingCases }}</dd>
       </div>
       <div class="status-bar__stat">
-        <dt>{{ $t('LabelMillionCases') }}</dt>
-        <dd>×{{ millionCount }}</dd>
+        <dt>{{ $t('LabelTopPrizeCount') }}</dt>
+        <dd>{{ topPrizeLabel }}</dd>
       </div>
     </dl>
     <div class="status-bar__actions">
@@ -87,6 +91,19 @@ const roundProgress = computed(() =>
     letter-spacing: 2px;
     text-transform: uppercase;
     color: var(--dond-text-dim);
+  }
+
+  &__badge {
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 10px;
+    color: var(--dond-gold);
+    background: var(--dond-gold-soft);
+
+    &--persona {
+      color: #a8bfd6;
+      background: #4d7fa526;
+    }
   }
 
   &__stats {

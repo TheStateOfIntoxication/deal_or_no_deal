@@ -1,19 +1,25 @@
 <script lang="ts" setup>
+import { computed } from 'vue'
 import AmountBoard from './components/AmountBoard.vue'
-import BankerCard from './components/BankerCard.vue'
-import CaseGrid from './components/CaseGrid.vue'
-import DrawScene from './components/DrawScene.vue'
+import GameDialogs from './components/GameDialogs.vue'
 import GameStatusBar from './components/GameStatusBar.vue'
-import OfferPanel from './components/OfferPanel.vue'
+import GameTable from './components/GameTable.vue'
 import PlayerCaseStage from './components/PlayerCaseStage.vue'
-import ResultDialog from './components/ResultDialog.vue'
 import RevealChip from './components/RevealChip.vue'
 import RoundHistory from './components/RoundHistory.vue'
-import SwapDialog from './components/SwapDialog.vue'
+import SetupScene from './components/SetupScene.vue'
 import { useGameSession } from './useGameSession'
+import { SetupPhaseEnum } from './types'
 
 const {
-  drawing,
+  setupPhase,
+  modeDeck,
+  selectedMode,
+  personaId,
+  mode,
+  modeLabel,
+  personaLabel,
+  topPrizeLabel,
   drawCandidates,
   pickedIndex,
   drawLowestAmount,
@@ -21,6 +27,7 @@ const {
   snapshot,
   errorText,
   hint,
+  adviceText,
   gridCases,
   playerCaseStats,
   revealVisible,
@@ -37,6 +44,15 @@ const {
   rage,
   noDealCount,
   offerMeta,
+  audienceMembers,
+  audienceRecommendations,
+  audienceReactions,
+  recommendedCaseNos,
+  handleModePick,
+  handleModeRethink,
+  handleModeConfirm,
+  handlePersonaPick,
+  handlePersonaConfirm,
   handlePick,
   beginGame,
   resetDraw,
@@ -46,17 +62,38 @@ const {
   handleSwap,
   dismissResult
 } = useGameSession()
+
+const playing = computed(() => setupPhase.value === SetupPhaseEnum.playing)
+
+const dialogState = computed(() => ({
+  swapVisible: swapVisible.value,
+  resultVisible: resultVisible.value,
+  result: snapshot.value.result,
+  bestPrize: bestPrize.value,
+  playerCaseNo: playerCaseStats.value.caseNo ?? 0,
+  otherCaseNo: gridCases.value[0]?.no ?? 0
+}))
 </script>
 
 <template>
-  <div class="game-page" :class="{ 'game-page--drawing': drawing }">
-    <DrawScene
-      v-if="drawing"
-      :error-text="errorText"
-      :candidates="drawCandidates"
+  <div class="game-page" :class="{ 'game-page--setup': !playing }">
+    <p v-if="errorText && !playing" class="game-page__error">{{ errorText }}</p>
+    <SetupScene
+      v-if="!playing"
+      :setup-phase="setupPhase"
+      :mode-deck="modeDeck"
+      :selected-mode="selectedMode"
+      :mode="mode"
+      :persona-id="personaId"
+      :draw-candidates="drawCandidates"
       :picked-index="pickedIndex"
-      :lowest-amount="drawLowestAmount"
+      :draw-lowest-amount="drawLowestAmount"
       :top-prize="topPrize"
+      @mode-pick="handleModePick"
+      @mode-rethink="handleModeRethink"
+      @mode-confirm="handleModeConfirm"
+      @persona-pick="handlePersonaPick"
+      @persona-confirm="handlePersonaConfirm"
       @pick="handlePick"
       @start="beginGame"
     />
@@ -65,7 +102,9 @@ const {
       <GameStatusBar
         :round="snapshot.round"
         :total-rounds="snapshot.totalRounds"
-        :million-count="snapshot.k"
+        :top-prize-label="topPrizeLabel"
+        :mode-label="modeLabel"
+        :persona-label="personaLabel"
         :remaining-cases="snapshot.remainingCaseCount"
         :remaining-to-open="snapshot.remainingToOpen"
         @restart="resetDraw"
@@ -78,45 +117,31 @@ const {
           <PlayerCaseStage :stats="playerCaseStats" />
           <AmountBoard :rows="snapshot.amountRows" />
         </aside>
-        <section class="game-page__table" :class="{ 'game-page__table--shake': tableShaking }">
-          <BankerCard
-            :expression="bankerExpression"
-            :confidence="bankerConfidence"
-            :rage="rage"
-            :no-deal-count="noDealCount"
-            :line="bankerLine"
-            :top-prize="snapshot.topPrize"
-          />
-          <OfferPanel
-            :visible="offerVisible"
-            :round="snapshot.round"
-            :offer="snapshot.currentOffer ?? 0"
-            :remaining-amounts="snapshot.remainingAmounts"
-            :round-opened="snapshot.roundOpened"
-            :fear="offerMeta?.fear ?? 0"
-            :rage-penalty="offerMeta?.ragePenalty ?? 0"
-            @deal="handleDeal"
-            @no-deal="handleNoDeal"
-          />
-          <CaseGrid
-            :cases="gridCases"
-            :phase="snapshot.phase"
-            :remaining-to-open="snapshot.remainingToOpen"
-            @select="handleSelect"
-          />
-        </section>
+        <GameTable
+          :snapshot="snapshot"
+          :grid-cases="gridCases"
+          :banker-expression="bankerExpression"
+          :banker-confidence="bankerConfidence"
+          :rage="rage"
+          :no-deal-count="noDealCount"
+          :banker-line="bankerLine"
+          :offer-visible="offerVisible"
+          :offer-meta="offerMeta"
+          :advice-text="adviceText"
+          :recommended-case-nos="recommendedCaseNos"
+          :audience-members="audienceMembers"
+          :audience-recommendations="audienceRecommendations"
+          :audience-reactions="audienceReactions"
+          :table-shaking="tableShaking"
+          @select="handleSelect"
+          @deal="handleDeal"
+          @no-deal="handleNoDeal"
+        />
       </main>
       <RoundHistory :logs="snapshot.logs" />
-      <SwapDialog
-        :visible="swapVisible"
-        :player-case-no="playerCaseStats.caseNo ?? 0"
-        :other-case-no="gridCases[0]?.no ?? 0"
-        @decide="handleSwap"
-      />
-      <ResultDialog
-        :visible="resultVisible"
-        :result="snapshot.result"
-        :best-prize="bestPrize"
+      <GameDialogs
+        v-bind="dialogState"
+        @swap="handleSwap"
         @restart="resetDraw"
         @dismiss="dismissResult"
       />
@@ -138,11 +163,10 @@ const {
   min-height: 100vh;
   padding: 16px clamp(14px, 3vw, 40px) 28px;
 
-  &--drawing {
-    align-items: center;
+  &--setup {
     justify-content: center;
-    padding-top: 28px;
-    padding-bottom: 28px;
+    padding-top: 24px;
+    padding-bottom: 24px;
   }
 
   &__hint {
@@ -169,20 +193,6 @@ const {
     display: flex;
     flex-direction: column;
     gap: 12px;
-  }
-
-  &__table {
-    display: flex;
-    flex-direction: column;
-    gap: 14px;
-    padding: 16px;
-    border: 1px solid var(--dond-gold-soft);
-    border-radius: var(--dond-radius);
-    background: linear-gradient(180deg, #123a2c 0%, #0a1c26 100%);
-
-    &--shake {
-      animation: game-table-shake 0.45s ease-in-out;
-    }
   }
 
   &__flash {
@@ -240,29 +250,6 @@ const {
 
   100% {
     opacity: 0;
-  }
-}
-
-@keyframes game-table-shake {
-  0%,
-  100% {
-    transform: translateX(0);
-  }
-
-  20% {
-    transform: translateX(-5px);
-  }
-
-  40% {
-    transform: translateX(4px);
-  }
-
-  60% {
-    transform: translateX(-3px);
-  }
-
-  80% {
-    transform: translateX(2px);
   }
 }
 </style>

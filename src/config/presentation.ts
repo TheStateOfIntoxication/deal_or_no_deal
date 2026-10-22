@@ -49,3 +49,12 @@ export const OFFER_MULTIPLIER_MAX = 1
 
 /** Banker confidence at or above which his offer line is the cocky variant */
 export const OFFER_CONFIDENT_CONFIDENCE = 0.7
+
+/** Audience reaction thresholds: cumulative share of pool amounts at or below the opened amount */
+export const AUDIENCE_HAPPY_SHARE = 0.3
+export const AUDIENCE_GUILT_SHARE = 0.9
+
+/** Audience mood is a 0–5 scale, starting neutral */
+export const AUDIENCE_MOOD_MIN = 0
+export const AUDIENCE_MOOD_MAX = 5
+export const AUDIENCE_MOOD_START = 3

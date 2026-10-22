@@ -1,4 +1,4 @@
-import type { DecidedByType } from '@/types/game'
+import type { DecidedByType, GameModeEnum, PlayerPersonaEnum } from '@/types/game'
 
 /** A single finished run */
 export interface RunRecordState {
@@ -7,6 +7,10 @@ export interface RunRecordState {
   decidedBy: DecidedByType
   swapped: boolean
   playedAt: number
+  /** v1.5 fields; optional for old localStorage records */
+  modeId?: GameModeEnum
+  personaId?: PlayerPersonaEnum
+  sessionSeed?: number
 }
 
 /** Aggregated player stats, persisted in localStorage */

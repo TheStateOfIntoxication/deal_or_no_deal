@@ -56,8 +56,32 @@ function mountGame(): ReturnType<typeof mount> {
   })
 }
 
-/** 开局摇奖：点第一个金球并开始游戏，返回抽到的 k */
+/** 开局：选经典玩法卡 → 稳重角色 → 摇第一颗金球并开始，返回抽到的 k */
 async function passDraw(wrapper: ReturnType<typeof mount>): Promise<number> {
+  const modeCard = wrapper.find('[data-mode="classic"]')
+  expect(modeCard.exists()).toBe(true)
+  await modeCard.trigger('click')
+  await wrapper.vm.$nextTick()
+
+  const modeButton = wrapper
+    .findAll('.setup__actions button')
+    .find((item) => item.text().includes(t('ModeConfirm')))
+  expect(modeButton).toBeDefined()
+  await modeButton?.trigger('click')
+  await wrapper.vm.$nextTick()
+
+  const personaCard = wrapper.find('[data-persona="pragmatic"]')
+  expect(personaCard.exists()).toBe(true)
+  await personaCard.trigger('click')
+  await wrapper.vm.$nextTick()
+
+  const personaButton = wrapper
+    .findAll('.setup__actions button')
+    .find((item) => item.text().includes(t('PersonaConfirm')))
+  expect(personaButton).toBeDefined()
+  await personaButton?.trigger('click')
+  await wrapper.vm.$nextTick()
+
   const balls = wrapper.findAll('.draw-panel__ball')
   expect(balls).toHaveLength(5)
 
@@ -123,9 +147,8 @@ describe('游戏页冒烟', () => {
     const wrapper = mountGame()
     await wrapper.vm.$nextTick()
 
-    // 摇奖阶段：只有金球，没有箱池
-    expect(wrapper.find('.draw-panel').isVisible()).toBe(true)
-    expect(wrapper.findAll('.draw-panel__ball')).toHaveLength(5)
+    // 开局阶段：先看到两张背面玩法卡，没有箱池
+    expect(wrapper.findAll('.mode-card')).toHaveLength(2)
     expect(wrapper.find('.case-grid__case').exists()).toBe(false)
 
     await pickAndOpenFirstRound(wrapper)
@@ -225,8 +248,7 @@ describe('游戏页冒烟', () => {
     expect(restartButton).toBeDefined()
     await new DOMWrapper(restartButton as HTMLElement).trigger('click')
     await wrapper.vm.$nextTick()
-    expect(wrapper.find('.draw-panel').isVisible()).toBe(true)
-    expect(wrapper.findAll('.draw-panel__ball')).toHaveLength(5)
+    expect(wrapper.findAll('.mode-card')).toHaveLength(2)
     expect(wrapper.find('.case-grid__case').exists()).toBe(false)
 
     wrapper.unmount()

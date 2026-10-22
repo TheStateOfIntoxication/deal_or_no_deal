@@ -4,6 +4,27 @@ export interface RandomSource {
   next: () => number
 }
 
+/** FNV-1a 32-bit hash: derive independent random streams from one session seed */
+export function deriveSeed(seed: number, salt: string): number {
+  let hash = (2166136261 ^ (seed >>> 0)) >>> 0
+  for (let index = 0; index < salt.length; index += 1) {
+    hash ^= salt.charCodeAt(index)
+    hash = Math.imul(hash, 16777619)
+  }
+  return hash >>> 0
+}
+
+/** New session seed; crypto when available so decks do not repeat */
+export function createSeed(): number {
+  const cryptoApi = globalThis.crypto
+  if (cryptoApi?.getRandomValues) {
+    const buffer = new Uint32Array(1)
+    cryptoApi.getRandomValues(buffer)
+    return buffer[0] as number
+  }
+  return Math.floor(Math.random() * 0xffffffff)
+}
+
 /**
  * mulberry32: deterministic random source for a given seed
  * @param seed seed value; a random one is generated when omitted

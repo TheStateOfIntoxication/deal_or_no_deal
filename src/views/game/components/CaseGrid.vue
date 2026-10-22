@@ -8,6 +8,7 @@ const props = defineProps<{
   cases: CaseState[]
   phase: GamePhaseEnum
   remainingToOpen: number
+  recommendedCaseNos?: number[]
 }>()
 
 const emit = defineEmits<{ (e: 'select', caseNo: number): void }>()
@@ -23,6 +24,9 @@ const isDisabled = (item: CaseState): boolean => {
 const caseClass = (item: CaseState): Record<string, boolean> => {
   const classes: Record<string, boolean> = { 'case-grid__case--opened': item.opened }
   if (item.opened && item.grade) classes[`case-grid__case--${item.grade}`] = true
+  if (!item.opened && props.recommendedCaseNos?.includes(item.no)) {
+    classes['case-grid__case--recommended'] = true
+  }
   return classes
 }
 </script>
@@ -46,6 +50,12 @@ const caseClass = (item: CaseState): Record<string, boolean> => {
           class="case-grid__flag"
         >
           !
+        </span>
+        <span
+          v-if="!item.opened && recommendedCaseNos?.includes(item.no)"
+          class="case-grid__recommend"
+        >
+          {{ $t('AudienceRecommendedCase') }}
         </span>
       </button>
     </li>
@@ -89,6 +99,11 @@ const caseClass = (item: CaseState): Record<string, boolean> => {
     &--opened {
       background: #0d1c2a;
       border-color: #23425c;
+    }
+
+    &--recommended {
+      border-color: var(--dond-gold);
+      box-shadow: 0 0 0 2px #f2c14e55, 0 0 20px #f2c14e33;
     }
 
     &--good {
@@ -146,6 +161,20 @@ const caseClass = (item: CaseState): Record<string, boolean> => {
     font-size: 12px;
     font-weight: 700;
     color: var(--dond-danger);
+  }
+
+  &__recommend {
+    position: absolute;
+    bottom: -7px;
+    left: 50%;
+    z-index: 2;
+    width: max-content;
+    padding: 1px 5px;
+    border-radius: 999px;
+    font-size: 9px;
+    color: #08131f;
+    background: var(--dond-gold);
+    transform: translateX(-50%);
   }
 
   @media (max-width: 1200px) {

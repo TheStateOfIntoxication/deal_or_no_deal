@@ -66,6 +66,14 @@ const payoutText = computed(() =>
           <dt>{{ $t('ResultOtherCaseAmount') }}</dt>
           <dd>{{ formatMoney(result.otherCaseAmount) }}</dd>
         </div>
+        <div v-if="result.personaBonus > 0">
+          <dt>{{ $t('ResultBasePrize') }}</dt>
+          <dd>{{ formatMoney(result.basePrize) }}</dd>
+        </div>
+        <div v-if="result.personaBonus > 0">
+          <dt>{{ $t('ResultPersonaBonus') }}</dt>
+          <dd>+{{ formatMoney(result.personaBonus) }}</dd>
+        </div>
         <div>
           <dt>{{ $t('LabelSwap') }}</dt>
           <dd>{{ swappedText }}</dd>

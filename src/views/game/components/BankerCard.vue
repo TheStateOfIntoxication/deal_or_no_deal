@@ -1,8 +1,9 @@
 <script lang="ts" setup>
 import { computed } from 'vue'
 import { formatMoney } from '@/utils/money'
-import { formatPercent } from '@/utils/percent'
-import type { BankerExpression } from '../types'
+import { formatPercent, formatSignedPercent } from '@/utils/percent'
+import { BANKER_PLAN_LABEL_KEYS } from '../bankerLines'
+import type { BankerExpression, BankerPlanState } from '../types'
 
 const props = defineProps<{
   expression: BankerExpression
@@ -11,10 +12,12 @@ const props = defineProps<{
   noDealCount: number
   line: string
   topPrize: number
+  plan: BankerPlanState | null
 }>()
 
 const confidenceText = computed(() => formatPercent(props.confidence, 0))
 const rageBarWidth = computed(() => `${Math.min(100, Math.max(0, props.rage))}%`)
+const planText = computed(() => formatSignedPercent(props.plan?.delta ?? 0))
 </script>
 
 <template>
@@ -49,6 +52,9 @@ const rageBarWidth = computed(() => `${Math.min(100, Math.max(0, props.rage))}%`
         <span class="banker-card__name">{{ $t('BankerTitle') }}</span>
         <span class="banker-card__confidence">
           {{ $t('BankerConfidence') }} {{ confidenceText }}
+        </span>
+        <span v-if="plan && plan.delta !== 0" class="banker-card__plan">
+          {{ $t(BANKER_PLAN_LABEL_KEYS[plan.id]) }} {{ planText }}
         </span>
       </div>
       <p class="banker-card__bet">
@@ -232,6 +238,14 @@ const rageBarWidth = computed(() => `${Math.min(100, Math.max(0, props.rage))}%`
   &__confidence {
     font-size: 11px;
     color: var(--dond-text-dim);
+  }
+
+  &__plan {
+    padding: 1px 7px;
+    border-radius: 999px;
+    font-size: 10px;
+    color: #08131f;
+    background: #e08b3a;
   }
 
   &__bet {

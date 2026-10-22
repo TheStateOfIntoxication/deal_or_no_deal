@@ -1,6 +1,9 @@
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import type { ComputedRef, Ref } from 'vue'
-import { createGameConfig } from '@/config/game'
+import { GAME_MODES, createModeGameConfig, getGameMode } from '@/config/modes'
+import type { GameModeDefinition } from '@/config/modes'
+import { PRAGMATIC_ADVICE_THRESHOLD, getPlayerPersona } from '@/config/personas'
+import type { PlayerPersonaDefinition } from '@/config/personas'
 import {
   FINAL_REVEAL_MS,
   FLASH_MS,
@@ -17,15 +20,28 @@ import {
 import { t } from '@/language'
 import type { MessageKey, MessageParams } from '@/language'
 import { useStore } from '@/store'
-import { AmountGradeEnum, PayoutGradeEnum } from '@/types/game'
+import {
+  AmountGradeEnum,
+  GameModeEnum,
+  PayoutGradeEnum,
+  PlayerPersonaEnum
+} from '@/types/game'
 import { formatMoney } from '@/utils/money'
-import { useAudio } from './useAudio'
-import { createBankerLinePicker } from './bankerLines'
-import type { BankerEvent } from './bankerLines'
-import { GameEngine } from './services/GameEngine'
+import { createRandom, createSeed, deriveSeed } from '@/utils/random'
+import { OfferCalculator } from './services/OfferCalculator'
 import { PoolBuilder } from './services/PoolBuilder'
-import { EngineErrorEnum, GamePhaseEnum } from './types'
+import { GameEngine } from './services/GameEngine'
+import { AudienceDirector } from './services/AudienceDirector'
+import { buildModeDeck } from './services/ModeDeckBuilder'
+import type { ModeCardState } from './services/ModeDeckBuilder'
+import { useAudio } from './useAudio'
+import { BANKER_PLAN_EVENTS, createBankerLinePicker } from './bankerLines'
+import type { BankerEvent } from './bankerLines'
+import { EngineErrorEnum, GamePhaseEnum, SetupPhaseEnum } from './types'
 import type {
+  AudienceMemberState,
+  AudienceReactionState,
+  AudienceRecommendationState,
   BankerExpression,
   BankerOfferMetaState,
   CaseState,
@@ -43,12 +59,22 @@ const ERROR_KEYS: Record<EngineErrorEnum, MessageKey> = {
   [EngineErrorEnum.caseAlreadyOpened]: 'ErrorCaseAlreadyOpened',
   [EngineErrorEnum.playerCaseForbidden]: 'ErrorPlayerCaseForbidden',
   [EngineErrorEnum.openQuotaReached]: 'ErrorOpenQuotaReached',
+  [EngineErrorEnum.personaLocked]: 'ErrorPersonaLocked',
+  [EngineErrorEnum.noDealLocked]: 'ErrorNoDealLocked',
   [EngineErrorEnum.gameOver]: 'ErrorGameOver'
 }
 
 /** 单局会话对外暴露的状态与操作 */
 export interface GameSessionApi {
-  drawing: Ref<boolean>
+  setupPhase: Ref<SetupPhaseEnum>
+  modeDeck: Ref<ModeCardState[]>
+  selectedMode: ComputedRef<GameModeEnum | null>
+  personaId: Ref<PlayerPersonaEnum | null>
+  mode: ComputedRef<GameModeDefinition | null>
+  persona: ComputedRef<PlayerPersonaDefinition | null>
+  modeLabel: ComputedRef<string>
+  personaLabel: ComputedRef<string>
+  topPrizeLabel: ComputedRef<string>
   drawCandidates: Ref<number[]>
   pickedIndex: Ref<number | null>
   drawLowestAmount: ComputedRef<number>
@@ -56,6 +82,7 @@ export interface GameSessionApi {
   snapshot: Ref<GameSnapshot>
   errorText: ComputedRef<string>
   hint: ComputedRef<string>
+  adviceText: ComputedRef<string>
   gridCases: ComputedRef<CaseState[]>
   playerCaseStats: ComputedRef<PlayerCaseStats>
   revealVisible: ComputedRef<boolean>
@@ -72,6 +99,17 @@ export interface GameSessionApi {
   rage: ComputedRef<number>
   noDealCount: ComputedRef<number>
   offerMeta: ComputedRef<BankerOfferMetaState | null>
+  dealLocked: ComputedRef<boolean>
+  noDealLocked: ComputedRef<boolean>
+  audienceMembers: Ref<AudienceMemberState[]>
+  audienceRecommendations: Ref<AudienceRecommendationState[]>
+  audienceReactions: Ref<AudienceReactionState[]>
+  recommendedCaseNos: ComputedRef<number[]>
+  handleModePick: (index: number) => void
+  handleModeRethink: () => void
+  handleModeConfirm: () => void
+  handlePersonaPick: (id: PlayerPersonaEnum) => void
+  handlePersonaConfirm: () => void
   handlePick: (index: number) => void
   beginGame: () => void
   resetDraw: () => void
@@ -83,30 +121,37 @@ export interface GameSessionApi {
 }
 
 /**
- * 单局游戏会话：摇奖开局、开箱节奏、报价决策、结算节奏与战绩落库
- * 规则逻辑全部在 services/GameEngine，本 composable 只负责编排 UI 状态
+ * 单局游戏会话：玩法卡/角色选择 → 摇奖或揭幕 → 开箱节奏 → 报价决策 → 结算
+ * 规则逻辑在 services/GameEngine；本 composable 只负责编排 UI 状态与观众表现
  */
 export function useGameSession(): GameSessionApi {
-  const gameConfig = createGameConfig()
-  const engine = new GameEngine(gameConfig)
+  const sessionSeed = ref<number>(createSeed())
+  const setupPhase = ref<SetupPhaseEnum>(SetupPhaseEnum.modeDraw)
+  const modeDeck = ref<ModeCardState[]>([])
+  /** Reserved for a future multi-mode persona; the current UI keeps exactly one id */
+  const selectedModeIds = ref<GameModeEnum[]>([])
+  const selectedMode = computed<GameModeEnum | null>(() => selectedModeIds.value[0] ?? null)
+  const personaId = ref<PlayerPersonaEnum | null>(null)
+
+  let engine = new GameEngine(
+    createModeGameConfig(GameModeEnum.classic, sessionSeed.value),
+    GameModeEnum.classic
+  )
   const snapshot = ref<GameSnapshot>(engine.getSnapshot())
   const errorKey = ref<MessageKey | null>(null)
   const errorParams = reactive<MessageParams>({})
 
-  /** 清空错误提示与占位参数 */
   const clearError = (): void => {
     errorKey.value = null
     for (const key of Object.keys(errorParams)) delete errorParams[key]
   }
+
   const store = useStore()
   const { playOpen, playOffer, playGrade, playPayout, playDraw } = useAudio()
 
-  /** 开局摇奖：玩家从金球中抽本局的百万箱数量 */
-  const drawing = ref<boolean>(true)
   const drawCandidates = ref<number[]>([])
   const pickedIndex = ref<number | null>(null)
 
-  /** 报价面板在开箱亮相之后才出现；结算先翻牌再出结算面板 */
   const offerReady = ref<boolean>(false)
   const finalRevealed = ref<boolean>(false)
   const resultReady = ref<boolean>(false)
@@ -115,10 +160,28 @@ export function useGameSession(): GameSessionApi {
   const nextBankerLine = createBankerLinePicker()
   const bankerLineKey = ref<MessageKey>('BankerLineGreeting1')
   const meltdownActive = ref(false)
+
+  let audienceDirector: AudienceDirector | null = null
+  const audienceMembers = ref<AudienceMemberState[]>([])
+  const audienceRecommendations = ref<AudienceRecommendationState[]>([])
+  const audienceReactions = ref<AudienceReactionState[]>([])
+
   let holdTimer: number | undefined
   let flashTimer: number | undefined
   let revealTimer: number | undefined
   let resultTimer: number | undefined
+
+  const mode = computed<GameModeDefinition | null>(() =>
+    selectedMode.value ? getGameMode(selectedMode.value) : null
+  )
+  const persona = computed<PlayerPersonaDefinition | null>(() =>
+    personaId.value ? getPlayerPersona(personaId.value) : null
+  )
+  const modeLabel = computed(() => (mode.value ? t(mode.value.nameKey) : ''))
+  const personaLabel = computed(() => (persona.value ? t(persona.value.nameKey) : ''))
+  const topPrizeLabel = computed(
+    () => `${formatMoney(snapshot.value.topPrize)} ×${snapshot.value.topPrizeCount}`
+  )
 
   const phase = computed(() => snapshot.value.phase)
   const pickedK = computed(() => {
@@ -128,9 +191,9 @@ export function useGameSession(): GameSessionApi {
   const drawLowestAmount = computed(() => {
     const k = pickedK.value
     if (k === null) return 0
-    return Math.min(...PoolBuilder.build(gameConfig, k))
+    return Math.min(...PoolBuilder.build(createModeGameConfig(GameModeEnum.classic), k))
   })
-  const topPrize = computed(() => gameConfig.topPrize)
+  const topPrize = computed(() => mode.value?.overrides.topPrize ?? snapshot.value.topPrize)
   const offerVisible = computed(
     () => phase.value === GamePhaseEnum.offerPending && offerReady.value
   )
@@ -153,6 +216,8 @@ export function useGameSession(): GameSessionApi {
   const rage = computed(() => snapshot.value.rage)
   const noDealCount = computed(() => snapshot.value.noDealCount)
   const offerMeta = computed(() => snapshot.value.offerMeta)
+  const dealLocked = computed(() => snapshot.value.dealLocked)
+  const noDealLocked = computed(() => snapshot.value.noDealLocked)
   const hideSettledReveal = computed(
     () => phase.value === GamePhaseEnum.settled && !finalRevealed.value
   )
@@ -210,6 +275,10 @@ export function useGameSession(): GameSessionApi {
       case GamePhaseEnum.opening:
         return t('HintOpenCases', { count: snapshot.value.remainingToOpen })
       case GamePhaseEnum.offerPending:
+        if (dealLocked.value) {
+          return t('PersonaGamblerLocked', { count: snapshot.value.totalRounds - snapshot.value.round })
+        }
+        if (noDealLocked.value) return t('OfferNoDealLocked')
         return offerReady.value ? t('HintOfferPending') : t('HintBankerCalling')
       case GamePhaseEnum.swapPending:
         return t('HintSwapPending')
@@ -219,6 +288,36 @@ export function useGameSession(): GameSessionApi {
         return t('HintChoosePlayerCase')
     }
   })
+  const offerRatio = computed(() => {
+    const offer = snapshot.value.currentOffer
+    if (offer === null) return 0
+    const ev = OfferCalculator.arithmeticMean(snapshot.value.remainingAmounts)
+    return ev > 0 ? offer / ev : 0
+  })
+  const adviceText = computed<string>(() => {
+    if (phase.value !== GamePhaseEnum.offerPending || !persona.value) return ''
+    if (persona.value.id === PlayerPersonaEnum.pragmatic) {
+      return offerRatio.value >= PRAGMATIC_ADVICE_THRESHOLD
+        ? t('PersonaPragmaticAdviceDeal')
+        : t('PersonaPragmaticAdviceHold')
+    }
+    if (persona.value.id === PlayerPersonaEnum.gambler) {
+      if (snapshot.value.round <= 8) {
+        return t('PersonaGamblerLocked', { count: snapshot.value.totalRounds - snapshot.value.round })
+      }
+      return t('PersonaGamblerFinal')
+    }
+    const mood = audienceMembers.value.length
+      ? audienceMembers.value.reduce((sum, member) => sum + member.mood, 0) /
+        audienceMembers.value.length
+      : 3
+    if (mood >= 3.5) return t('PersonaConformistAdviceHold')
+    if (mood <= 2.5) return t('PersonaConformistAdviceDeal')
+    return t('PersonaConformistAdviceWait')
+  })
+  const recommendedCaseNos = computed(() =>
+    audienceRecommendations.value.map((item) => item.caseNo)
+  )
   const errorText = computed(() => (errorKey.value ? t(errorKey.value, errorParams) : ''))
 
   const refresh = (): void => {
@@ -250,9 +349,39 @@ export function useGameSession(): GameSessionApi {
     window.clearTimeout(flashTimer)
   }
 
-  /** 回到摇奖：新一局都从金球抽奖开始，不自动开局 */
+  /** 把观众情绪同步给引擎；只有从众角色会真正影响报价 */
+  const syncAudience = (): void => {
+    audienceMembers.value = audienceDirector?.getMembers() ?? []
+    engine.setAudienceDelta(audienceDirector?.getOfferDelta() ?? 0)
+  }
+
+  const startAudienceRound = (): void => {
+    if (!audienceDirector || phase.value !== GamePhaseEnum.opening) return
+    audienceReactions.value = []
+    audienceRecommendations.value = audienceDirector.beginRound(
+      snapshot.value.cases,
+      snapshot.value.playerCaseNo
+    )
+    syncAudience()
+  }
+
+  /** 回到玩法卡：新一局重新抽卡、抽角色、抽种子 */
   const resetDraw = (): void => {
     clearTimers()
+    sessionSeed.value = createSeed()
+    setupPhase.value = SetupPhaseEnum.modeDraw
+    selectedModeIds.value = []
+    personaId.value = null
+    modeDeck.value = buildModeDeck(
+      GAME_MODES.map((item) => item.id),
+      createRandom(deriveSeed(sessionSeed.value, 'deck'))
+    )
+    pickedIndex.value = null
+    drawCandidates.value = []
+    audienceDirector = null
+    audienceMembers.value = []
+    audienceRecommendations.value = []
+    audienceReactions.value = []
     offerReady.value = false
     finalRevealed.value = false
     resultReady.value = false
@@ -260,11 +389,61 @@ export function useGameSession(): GameSessionApi {
     flashGrade.value = null
     meltdownActive.value = false
     bankerLineKey.value = 'BankerLineGreeting1'
-    pickedIndex.value = null
-    drawCandidates.value = engine.createKDraw()
-    drawing.value = true
+    engine = new GameEngine(
+      createModeGameConfig(GameModeEnum.classic, sessionSeed.value),
+      GameModeEnum.classic
+    )
     clearError()
     refresh()
+  }
+
+  const handleModePick = (index: number): void => {
+    if (setupPhase.value !== SetupPhaseEnum.modeDraw && setupPhase.value !== SetupPhaseEnum.modeReveal) {
+      return
+    }
+    const card = modeDeck.value[index]
+    if (!card) return
+    modeDeck.value = modeDeck.value.map((item, itemIndex) => ({
+      ...item,
+      revealed: itemIndex === index
+    }))
+    selectedModeIds.value = [card.modeId]
+    setupPhase.value = SetupPhaseEnum.modeReveal
+    playDraw()
+  }
+
+  const handleModeRethink = (): void => {
+    if (setupPhase.value !== SetupPhaseEnum.modeReveal) return
+    modeDeck.value = modeDeck.value.map((card) => ({ ...card, revealed: false }))
+    selectedModeIds.value = []
+    setupPhase.value = SetupPhaseEnum.modeDraw
+  }
+
+  const handleModeConfirm = (): void => {
+    if (!selectedMode.value || setupPhase.value !== SetupPhaseEnum.modeReveal) return
+    engine = new GameEngine(
+      createModeGameConfig(selectedMode.value, sessionSeed.value),
+      selectedMode.value
+    )
+    drawCandidates.value = []
+    pickedIndex.value = null
+    clearError()
+    refresh()
+    setupPhase.value = SetupPhaseEnum.personaPick
+  }
+
+  const handlePersonaPick = (id: PlayerPersonaEnum): void => {
+    if (setupPhase.value !== SetupPhaseEnum.personaPick) return
+    personaId.value = id
+  }
+
+  const handlePersonaConfirm = (): void => {
+    if (!personaId.value || setupPhase.value !== SetupPhaseEnum.personaPick) return
+    setupPhase.value = SetupPhaseEnum.modeSetup
+    if (mode.value?.setup === 'k-draw') {
+      drawCandidates.value = engine.createKDraw()
+      pickedIndex.value = null
+    }
   }
 
   const handlePick = (index: number): void => {
@@ -273,18 +452,28 @@ export function useGameSession(): GameSessionApi {
     playDraw()
   }
 
-  /** 用玩家抽到的 k 开局 */
+  /** 用玩家抽到的 k（经典）或固定 1 个顶奖（巨奖）开局 */
   const beginGame = (): void => {
-    const k = pickedK.value
-    if (k === null) return
-    const result = engine.start(k)
+    if (!selectedMode.value || !personaId.value) return
+    const isClassic = mode.value?.setup === 'k-draw'
+    const k = isClassic ? pickedK.value : undefined
+    if (isClassic && k === null) return
+
+    const result = engine.start(k ?? undefined, personaId.value)
     refresh()
     if (!result.ok) {
       reject(result.error, { codes: engine.getConfigErrors().join(', ') })
       return
     }
     clearError()
-    drawing.value = false
+    setupPhase.value = SetupPhaseEnum.playing
+    if (mode.value?.features.audience) {
+      audienceDirector = new AudienceDirector(
+        deriveSeed(sessionSeed.value, 'audience'),
+        personaId.value
+      )
+      syncAudience()
+    }
     pickBankerLine('greeting')
   }
 
@@ -300,6 +489,7 @@ export function useGameSession(): GameSessionApi {
     refresh()
     if (picking) {
       playOpen()
+      startAudienceRound()
       return
     }
 
@@ -307,6 +497,16 @@ export function useGameSession(): GameSessionApi {
     if (opened) {
       playGrade(opened.grade)
       flash(opened.grade)
+      if (audienceDirector) {
+        const reactions = audienceDirector.react(opened, snapshot.value.amountRows.map((row) => row.amount))
+        if (reactions.length > 0) {
+          audienceReactions.value = reactions
+          syncAudience()
+        }
+      }
+      if (snapshot.value.phase !== GamePhaseEnum.opening) {
+        audienceRecommendations.value = []
+      }
       if (opened.grade === AmountGradeEnum.disaster) pickBankerLine('gloat')
       else if (opened.grade === AmountGradeEnum.good) pickBankerLine('annoyedSmall')
     }
@@ -320,12 +520,19 @@ export function useGameSession(): GameSessionApi {
       k: snapshot.value.k,
       decidedBy: result.decidedBy,
       swapped: result.swapped,
-      playedAt: Date.now()
+      playedAt: Date.now(),
+      modeId: snapshot.value.modeId,
+      personaId: snapshot.value.personaId,
+      sessionSeed: sessionSeed.value
     })
   }
 
   const handleDeal = (): void => {
-    if (!engine.deal().ok) return
+    const result = engine.deal()
+    if (!result.ok) {
+      reject(result.error)
+      return
+    }
     clearError()
     refresh()
     persistResult()
@@ -342,8 +549,9 @@ export function useGameSession(): GameSessionApi {
     refresh()
     if (phase.value === GamePhaseEnum.settled) {
       persistResult()
-    } else {
+    } else if (phase.value === GamePhaseEnum.opening) {
       playOpen()
+      startAudienceRound()
     }
 
     const currentRage = snapshot.value.rage
@@ -354,7 +562,11 @@ export function useGameSession(): GameSessionApi {
   }
 
   const handleSwap = (shouldSwap: boolean): void => {
-    if (!engine.swap(shouldSwap).ok) return
+    const result = engine.swap(shouldSwap)
+    if (!result.ok) {
+      reject(result.error)
+      return
+    }
     clearError()
     refresh()
     persistResult()
@@ -379,9 +591,16 @@ export function useGameSession(): GameSessionApi {
       holdTimer = window.setTimeout(() => {
         offerReady.value = true
         playOffer()
-        pickBankerLine(
-          snapshot.value.bankerConfidence >= OFFER_CONFIDENT_CONFIDENCE ? 'offerConfident' : 'offerNervous'
-        )
+        const plan = snapshot.value.offerMeta?.plan?.id
+        if (plan) {
+          pickBankerLine(BANKER_PLAN_EVENTS[plan])
+        } else {
+          pickBankerLine(
+            snapshot.value.bankerConfidence >= OFFER_CONFIDENT_CONFIDENCE
+              ? 'offerConfident'
+              : 'offerNervous'
+          )
+        }
       }, REVEAL_HOLD_MS)
       return
     }
@@ -417,8 +636,17 @@ export function useGameSession(): GameSessionApi {
 
   onUnmounted(clearTimers)
 
+
   return {
-    drawing,
+    setupPhase,
+    modeDeck,
+    selectedMode,
+    personaId,
+    mode,
+    persona,
+    modeLabel,
+    personaLabel,
+    topPrizeLabel,
     drawCandidates,
     pickedIndex,
     drawLowestAmount,
@@ -426,6 +654,7 @@ export function useGameSession(): GameSessionApi {
     snapshot,
     errorText,
     hint,
+    adviceText,
     gridCases,
     playerCaseStats,
     revealVisible,
@@ -442,6 +671,17 @@ export function useGameSession(): GameSessionApi {
     rage,
     noDealCount,
     offerMeta,
+    dealLocked,
+    noDealLocked,
+    audienceMembers,
+    audienceRecommendations,
+    audienceReactions,
+    recommendedCaseNos,
+    handleModePick,
+    handleModeRethink,
+    handleModeConfirm,
+    handlePersonaPick,
+    handlePersonaConfirm,
     handlePick,
     beginGame,
     resetDraw,

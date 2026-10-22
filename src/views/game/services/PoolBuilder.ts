@@ -28,23 +28,28 @@ export class PoolBuilder {
       errors.push('baseAmounts')
     }
     if (base.length > 0 && config.topPrize < Math.max(...base)) errors.push('topPrize')
-    if (config.kMin < K_ABSOLUTE_MIN || config.kMax > K_ABSOLUTE_MAX || config.kMin > config.kMax) {
-      errors.push('kRange')
-    }
 
-    const span = config.kMax - config.kMin + 1
-    if (config.kWeights) {
-      const sum = config.kWeights.reduce((total, weight) => total + weight, 0)
-      const invalid = config.kWeights.length !== span || config.kWeights.some((weight) => weight < 0)
-      if (invalid || sum <= 0) errors.push('kWeights')
-    }
+    // Draw modes keep the classic 2–13 rule; fixed modes (e.g. jackpot) may use a single top prize.
+    if (config.randomKEnabled) {
+      if (config.kMin < K_ABSOLUTE_MIN || config.kMax > K_ABSOLUTE_MAX || config.kMin > config.kMax) {
+        errors.push('kRange')
+      }
+      if (
+        config.fixedK < config.kMin ||
+        config.fixedK > config.kMax ||
+        config.fixedK < K_ABSOLUTE_MIN ||
+        config.fixedK > K_ABSOLUTE_MAX
+      ) {
+        errors.push('fixedK')
+      }
 
-    if (
-      config.fixedK < config.kMin ||
-      config.fixedK > config.kMax ||
-      config.fixedK < K_ABSOLUTE_MIN ||
-      config.fixedK > K_ABSOLUTE_MAX
-    ) {
+      const span = config.kMax - config.kMin + 1
+      if (config.kWeights) {
+        const sum = config.kWeights.reduce((total, weight) => total + weight, 0)
+        const invalid = config.kWeights.length !== span || config.kWeights.some((weight) => weight < 0)
+        if (invalid || sum <= 0) errors.push('kWeights')
+      }
+    } else if (config.fixedK < 1 || config.fixedK > config.totalCases - 1) {
       errors.push('fixedK')
     }
 

@@ -8,11 +8,29 @@ import {
 } from '@/config/presentation'
 import type { GameConfig, OfferBaseMode } from '@/config/game'
 
-/** 银行家修正参数（R-6.4） */
+/** 银行家修正参数（R-6.4 + v1.5 计划/角色/观众） */
 export interface OfferBankerOptions {
   topPrize: number
   /** 当前怒气 0–100 */
   rage: number
+  /** 本轮计划增量，可正可负 */
+  plan?: number
+  /** 角色增量，可正可负 */
+  persona?: number
+  /** 观众增量，可正可负 */
+  audience?: number
+}
+
+/** 逐项乘数修正，供界面明示 */
+export interface OfferBreakdown {
+  base: number
+  fear: number
+  rage: number
+  plan: number
+  persona: number
+  audience: number
+  effective: number
+  clamped: boolean
 }
 
 /** 报价计算所需的参考值与最终结果 */
@@ -33,6 +51,8 @@ export interface OfferResult {
   ragePenalty: number
   /** 是否因边界约束被钳制（R-6.3.6） */
   clamped: boolean
+  /** 各来源明细 */
+  breakdown: OfferBreakdown
 }
 
 /** 银行家报价计算（第 6 章） */
@@ -86,7 +106,17 @@ export class OfferCalculator {
         probability: 0,
         fear: 0,
         ragePenalty: 0,
-        clamped: true
+        clamped: true,
+        breakdown: {
+          base: 0,
+          fear: 0,
+          rage: 0,
+          plan: 0,
+          persona: 0,
+          audience: 0,
+          effective: 0,
+          clamped: true
+        }
       }
     }
 
@@ -103,9 +133,12 @@ export class OfferCalculator {
       ? Math.min(FEAR_MAX, Math.max(0, FEAR_GAIN * (probability - FEAR_PIVOT)))
       : 0
     const ragePenalty = banker ? RAGE_MAX_PENALTY * (banker.rage / 100) : 0
+    const plan = banker?.plan ?? 0
+    const persona = banker?.persona ?? 0
+    const audience = banker?.audience ?? 0
     const effectiveMultiplier = Math.min(
       OFFER_MULTIPLIER_MAX,
-      Math.max(OFFER_MULTIPLIER_MIN, multiplier + fear - ragePenalty)
+      Math.max(OFFER_MULTIPLIER_MIN, multiplier + fear - ragePenalty + plan + persona + audience)
     )
 
     // 最差结果不打折，只折上行部分；剩余金额整体偏高时报价就会接近均值
@@ -128,7 +161,17 @@ export class OfferCalculator {
       probability,
       fear: Math.max(0, fear),
       ragePenalty,
-      clamped: amount !== raw
+      clamped: amount !== raw,
+      breakdown: {
+        base: multiplier,
+        fear: Math.max(0, fear),
+        rage: ragePenalty,
+        plan,
+        persona,
+        audience,
+        effective: effectiveMultiplier,
+        clamped: amount !== raw
+      }
     }
   }
 }
