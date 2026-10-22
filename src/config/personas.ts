@@ -33,7 +33,7 @@ export const RAISER_OFFER_BOOST = 0.08
 /** Closer: final non-top case pays this share */
 export const CLOSER_FINAL_RATE = 0.5
 /** Restorer: only trigger while at least this many cases remain (before the final two) */
-export const RESTORER_MIN_REMAINING = 3
+export const RESTORER_MIN_REMAINING = 5
 
 export const PLAYER_PERSONAS: PlayerPersonaDefinition[] = [
   {

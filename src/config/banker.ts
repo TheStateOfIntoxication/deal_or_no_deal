@@ -29,3 +29,6 @@ export const BANKER_PLAN_BASE_WEIGHTS: Record<BankerPlanEnum, number> = {
   [BankerPlanEnum.generous]: 1,
   [BankerPlanEnum.finalPush]: 0
 }
+
+/** Gambler honor bonus when the final prize beats the banker highest offer */
+export const BANKER_HONOR_RATE = 0.1

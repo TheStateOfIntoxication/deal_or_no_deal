@@ -11,6 +11,7 @@ import {
   RAISER_OFFER_BOOST,
   RESTORER_MIN_REMAINING
 } from '@/config/personas'
+import { BANKER_HONOR_RATE } from '@/config/banker'
 import { BankerProfileEnum, getBankerProfile } from '@/config/bankers'
 import type { BankerProfile } from '@/config/bankers'
 import { RAGE_MAX, RAGE_PER_NO_DEAL } from '@/config/presentation'
@@ -434,7 +435,11 @@ export class GameEngine {
         plan: plan.delta,
         persona: personaDelta,
         audience: audienceDelta,
-        raise: state.personaId === PlayerPersonaEnum.raiser ? RAISER_OFFER_BOOST : 0
+        raise: state.personaId === PlayerPersonaEnum.raiser ? RAISER_OFFER_BOOST : 0,
+        baseMultiplier:
+          this.bankerProfile.offerMode === 'highest'
+            ? OfferCalculator.maxMultiplier(this.config)
+            : undefined
       }
     )
 
@@ -487,10 +492,22 @@ export class GameEngine {
     ) {
       prize = Math.floor(basePrize * CLOSER_FINAL_RATE)
     }
-    const personaBonus = prize - basePrize
+    const personaPrize = prize
+    let honorBonus = 0
+    if (
+      state.personaId === PlayerPersonaEnum.gambler &&
+      decidedBy !== 'deal' &&
+      state.highestOffer > 0 &&
+      personaPrize > state.highestOffer
+    ) {
+      honorBonus = Math.floor(personaPrize * BANKER_HONOR_RATE)
+      prize = personaPrize + honorBonus
+    }
+    const personaBonus = personaPrize - basePrize
     state.result = {
       basePrize,
       personaBonus,
+      honorBonus,
       prize,
       payoutGrade: AmountGrader.payoutGradeOf(prize, state.pool, this.config.topPrize),
       decidedBy,

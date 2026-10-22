@@ -40,6 +40,11 @@ const planText = computed(() => formatSignedPercent(props.plan?.delta ?? 0))
 const personaText = computed(() => formatSignedPercent(props.breakdown?.persona ?? 0))
 const audienceText = computed(() => formatSignedPercent(props.breakdown?.audience ?? 0))
 const raiseText = computed(() => formatPercent(props.breakdown?.raise ?? 0))
+const offerRatioText = computed(() => {
+  if (props.remainingAmounts.length === 0) return '0.0%'
+  const mean = props.remainingAmounts.reduce((sum, amount) => sum + amount, 0) / props.remainingAmounts.length
+  return formatPercent(mean > 0 ? props.offer / mean : 0)
+})
 </script>
 
 <template>
@@ -70,6 +75,7 @@ const raiseText = computed(() => formatPercent(props.breakdown?.raise ?? 0))
     <div class="offer-panel__meta">
       <span>{{ $t('OfferRemainingCount', { count: remainingAmounts.length }) }}</span>
       <span>{{ $t('OfferRemainingHint') }} {{ rangeText }}</span>
+      <span class="offer-panel__ratio">{{ $t('OfferRatio', { percent: offerRatioText }) }}</span>
       <span v-if="fear > 0" class="offer-panel__tag offer-panel__tag--fear">
         {{ $t('BankerAdjustFear', { percent: fearText }) }}
       </span>

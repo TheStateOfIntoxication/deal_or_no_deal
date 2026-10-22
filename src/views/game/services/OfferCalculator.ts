@@ -21,6 +21,8 @@ export interface OfferBankerOptions {
   audience?: number
   /** 最终报价的金额加成（如抬价师 8%） */
   raise?: number
+  /** 覆盖本轮基础乘数（慈善家取曲线最高档） */
+  baseMultiplier?: number
 }
 
 /** 逐项乘数修正，供界面明示 */
@@ -80,6 +82,12 @@ export class OfferCalculator {
       : OfferCalculator.arithmeticMean(amounts)
   }
 
+  /** 当前基础模式的最高档乘数（慈善家使用） */
+  static maxMultiplier(config: GameConfig): number {
+    const curve = config.offerBaseMode === 'rms' ? config.rmsMultipliers : config.offerMultipliers
+    return Math.max(...curve)
+  }
+
   /** 第 round 轮（1–9）的乘数（R-6.2.1、R-6.2.5） */
   static multiplier(config: GameConfig, round: number): number {
     const curve = config.offerBaseMode === 'rms' ? config.rmsMultipliers : config.offerMultipliers
@@ -127,7 +135,7 @@ export class OfferCalculator {
     const lower = Math.min(...amounts)
     const upper = Math.max(...amounts)
     const reference = OfferCalculator.reference(amounts, config.offerBaseMode)
-    const multiplier = OfferCalculator.multiplier(config, round)
+    const multiplier = banker?.baseMultiplier ?? OfferCalculator.multiplier(config, round)
 
     // 银行家：你越可能中顶奖，他越怕（加价）；你越拒绝，他越扣（压价）
     const probability = banker

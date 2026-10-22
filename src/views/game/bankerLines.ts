@@ -66,12 +66,32 @@ export const BANKER_PLAN_LABEL_KEYS: Record<BankerPlanEnum, MessageKey> = {
   [BankerPlanEnum.finalPush]: 'BankerPlanFinalPush'
 }
 
+const GENTLE_LINE_POOLS: Record<BankerEvent, MessageKey[]> = {
+  greeting: ['BankerLineCharityGreeting1'],
+  offerConfident: ['BankerLineCharityOffer1'],
+  offerNervous: ['BankerLineCharityOffer1'],
+  noDealCalm: ['BankerLineCharityNoDeal1'],
+  noDealAnnoyed: ['BankerLineCharityNoDeal1'],
+  noDealAngry: ['BankerLineCharityNoDeal1'],
+  noDealFurious: ['BankerLineCharityNoDeal1'],
+  deal: ['BankerLineCharityDeal1'],
+  gloat: ['BankerLineCharityGloat1'],
+  annoyedSmall: ['BankerLineCharityGloat1'],
+  meltdown: ['BankerLineCharityMeltdown1'],
+  planSteady: ['BankerLineCharityPlan1'],
+  planLowball: ['BankerLineCharityPlan1'],
+  planRebate: ['BankerLineCharityPlan1'],
+  planGenerous: ['BankerLineCharityPlan1'],
+  planFinalPush: ['BankerLineCharityPlan1']
+}
+
 /** 创建一个台词选择器：同一事件内随机、且避免与上一条重复 */
-export function createBankerLinePicker(): (event: BankerEvent) => MessageKey {
+export function createBankerLinePicker(tone: 'sharp' | 'gentle' = 'sharp'): (event: BankerEvent) => MessageKey {
   let lastKey: MessageKey | null = null
+  const pools = tone === 'gentle' ? GENTLE_LINE_POOLS : LINE_POOLS
 
   return (event: BankerEvent): MessageKey => {
-    const pool = LINE_POOLS[event]
+    const pool = pools[event]
     if (pool.length === 1) return pool[0]
 
     const candidates = pool.filter((key) => key !== lastKey)

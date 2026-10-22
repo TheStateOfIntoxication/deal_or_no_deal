@@ -35,7 +35,8 @@ export const CHARITY_BANKER_PROFILE: BankerProfile = {
   lineTone: 'gentle'
 }
 
-const BANKER_PROFILES = [DEFAULT_BANKER_PROFILE, CHARITY_BANKER_PROFILE]
+export const BANKER_PROFILES = [DEFAULT_BANKER_PROFILE, CHARITY_BANKER_PROFILE]
+export const GAME_BANKER_IDS: BankerProfileEnum[] = BANKER_PROFILES.map((profile) => profile.id)
 const BANKER_PROFILE_MAP = new Map(BANKER_PROFILES.map((profile) => [profile.id, profile]))
 
 export function getBankerProfile(id: BankerProfileEnum): BankerProfile {

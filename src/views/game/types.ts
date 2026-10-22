@@ -81,6 +81,8 @@ export interface GameResultState {
   basePrize: number
   /** 角色修正（赌徒终局可正可负；其他角色 0） */
   personaBonus: number
+  /** 打脸银行家的荣誉奖金（赌徒终局且奖金超过最高报价） */
+  honorBonus: number
   /** 到手奖金 = basePrize + personaBonus */
   prize: number
   /** 到手奖金的展示档位 */

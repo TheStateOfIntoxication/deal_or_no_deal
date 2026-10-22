@@ -12,6 +12,7 @@ const props = defineProps<{
   noDealCount: number
   line: string
   name: string
+  trait: string
   topPrize: number
   plan: BankerPlanState | null
 }>()
@@ -51,6 +52,7 @@ const planText = computed(() => formatSignedPercent(props.plan?.delta ?? 0))
     <div class="banker-card__body">
       <div class="banker-card__head">
         <span class="banker-card__name">{{ props.name }}</span>
+        <span class="banker-card__trait">{{ props.trait }}</span>
         <span class="banker-card__confidence">
           {{ $t('BankerConfidence') }} {{ confidenceText }}
         </span>
@@ -239,6 +241,11 @@ const planText = computed(() => formatSignedPercent(props.plan?.delta ?? 0))
   &__confidence {
     font-size: 11px;
     color: var(--dond-text-dim);
+  }
+
+  &__trait {
+    font-size: 10px;
+    color: #6f8aa3;
   }
 
   &__plan {

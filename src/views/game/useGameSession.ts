@@ -1,6 +1,6 @@
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import type { ComputedRef, Ref } from 'vue'
-import { getBankerProfile } from '@/config/bankers'
+import { BankerProfileEnum, getBankerProfile } from '@/config/bankers'
 import { GAME_MODES, createModeGameConfig, getGameMode } from '@/config/modes'
 import type { GameModeDefinition } from '@/config/modes'
 import { PRAGMATIC_ADVICE_THRESHOLD, getPlayerPersona } from '@/config/personas'
@@ -33,6 +33,7 @@ import { OfferCalculator } from './services/OfferCalculator'
 import { PoolBuilder } from './services/PoolBuilder'
 import { GameEngine } from './services/GameEngine'
 import { AudienceDirector } from './services/AudienceDirector'
+import { BankerRotation } from './services/BankerRotation'
 import { buildModeDeck } from './services/ModeDeckBuilder'
 import type { ModeCardState } from './services/ModeDeckBuilder'
 import { useAudio } from './useAudio'
@@ -95,6 +96,7 @@ export interface GameSessionApi {
   flashGrade: Ref<AmountGradeEnum | PayoutGradeEnum | null>
   bankerLine: ComputedRef<string>
   bankerName: ComputedRef<string>
+  bankerTrait: ComputedRef<string>
   bankerExpression: ComputedRef<BankerExpression>
   bankerConfidence: ComputedRef<number>
   rage: ComputedRef<number>
@@ -156,7 +158,10 @@ export function useGameSession(): GameSessionApi {
   const resultReady = ref<boolean>(false)
   const resultDismissed = ref<boolean>(false)
   const flashGrade = ref<AmountGradeEnum | PayoutGradeEnum | null>(null)
-  const nextBankerLine = createBankerLinePicker()
+  const bankerRotation = new BankerRotation(createSeed())
+  const bankerProfileId = ref<BankerProfileEnum>(BankerProfileEnum.default)
+  const bankerProfile = computed(() => getBankerProfile(bankerProfileId.value))
+  let nextBankerLine = createBankerLinePicker()
   const bankerLineKey = ref<MessageKey>('BankerLineGreeting1')
   const meltdownActive = ref(false)
 
@@ -204,7 +209,8 @@ export function useGameSession(): GameSessionApi {
   const tableShaking = computed(() => flashGrade.value === AmountGradeEnum.disaster)
   const bestPrize = computed(() => store.state.record.bestPrize)
   const bankerLine = computed(() => t(bankerLineKey.value))
-  const bankerName = computed(() => t(getBankerProfile(snapshot.value.bankerId).nameKey))
+  const bankerName = computed(() => t(bankerProfile.value.nameKey))
+  const bankerTrait = computed(() => t(bankerProfile.value.traitKey))
   const bankerExpression = computed<BankerExpression>(() => {
     if (meltdownActive.value) return 'furious'
     const value = snapshot.value.rage
@@ -391,9 +397,12 @@ export function useGameSession(): GameSessionApi {
     flashGrade.value = null
     meltdownActive.value = false
     bankerLineKey.value = 'BankerLineGreeting1'
+    bankerProfileId.value = bankerRotation.next()
+    nextBankerLine = createBankerLinePicker(bankerProfile.value.lineTone)
     engine = new GameEngine(
       createModeGameConfig(GameModeEnum.classic, sessionSeed.value),
-      GameModeEnum.classic
+      GameModeEnum.classic,
+      bankerProfileId.value
     )
     clearError()
     refresh()
@@ -425,7 +434,8 @@ export function useGameSession(): GameSessionApi {
     if (!selectedMode.value || setupPhase.value !== SetupPhaseEnum.modeReveal) return
     engine = new GameEngine(
       createModeGameConfig(selectedMode.value, sessionSeed.value),
-      selectedMode.value
+      selectedMode.value,
+      bankerProfileId.value
     )
     drawCandidates.value = []
     pickedIndex.value = null
@@ -669,6 +679,7 @@ export function useGameSession(): GameSessionApi {
     flashGrade,
     bankerLine,
     bankerName,
+    bankerTrait,
     bankerExpression,
     bankerConfidence,
     rage,

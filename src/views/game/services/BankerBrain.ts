@@ -117,6 +117,11 @@ export function chooseBankerPlan(
     weights.rebate = ctx.lastRejected ? 1 : 0
   }
 
+  // Profile weights are the final word (e.g. charity forbids lowball).
+  for (const [plan, weight] of Object.entries(profile.planWeights)) {
+    weights[plan as BankerPlanEnum] = weight
+  }
+
   const candidates = Object.values(BankerPlanEnum)
     .filter((plan) => allowed(plan, ctx) && weights[plan] > 0)
     .filter((plan) => !repeatsTwice(plan, ctx.planHistory))

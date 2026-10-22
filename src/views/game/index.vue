@@ -40,6 +40,7 @@ const {
   flashGrade,
   bankerLine,
   bankerName,
+  bankerTrait,
   bankerExpression,
   bankerConfidence,
   rage,
@@ -128,6 +129,7 @@ const dialogState = computed(() => ({
           :no-deal-count="noDealCount"
           :banker-line="bankerLine"
           :banker-name="bankerName"
+          :banker-trait="bankerTrait"
           :offer-visible="offerVisible"
           :offer-meta="offerMeta"
           :advice-text="adviceText"

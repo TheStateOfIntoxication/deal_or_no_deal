@@ -75,6 +75,10 @@ const payoutText = computed(() =>
           <dt>{{ $t('ResultPersonaBonus') }}</dt>
           <dd>{{ formatSignedMoney(result.personaBonus) }}</dd>
         </div>
+        <div v-if="result.honorBonus > 0">
+          <dt>{{ $t('ResultHonorBonus') }}</dt>
+          <dd>+{{ formatMoney(result.honorBonus) }}</dd>
+        </div>
         <div>
           <dt>{{ $t('LabelSwap') }}</dt>
           <dd>{{ swappedText }}</dd>

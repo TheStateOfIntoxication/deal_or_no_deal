@@ -15,6 +15,7 @@ const props = defineProps<{
   noDealCount: number
   bankerLine: string
   bankerName: string
+  bankerTrait: string
   offerVisible: boolean
   offerMeta: BankerOfferMetaState | null
   adviceText: string
@@ -41,6 +42,7 @@ const emit = defineEmits<{
       :no-deal-count="props.noDealCount"
       :line="props.bankerLine"
       :name="props.bankerName"
+      :trait="props.bankerTrait"
       :top-prize="props.snapshot.topPrize"
       :plan="props.offerVisible ? (props.offerMeta?.plan ?? null) : null"
     />
