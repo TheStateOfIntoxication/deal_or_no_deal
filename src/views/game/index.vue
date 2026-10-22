@@ -83,7 +83,7 @@ const flashStyle = computed(() => {
   const tone = flashTone.value
   if (!tone) return {}
   return {
-    boxShadow: `inset 0 0 ${Math.round(110 + tone.ratio * 80)}px ${Math.round(22 + tone.ratio * 28)}px ${tone.glow}`
+    background: `radial-gradient(circle at 50% 50%, transparent 42%, ${tone.glow} 100%)`
   }
 })
 
@@ -230,6 +230,7 @@ const dialogState = computed(() => ({
     inset: 0;
     z-index: 60;
     pointer-events: none;
+    will-change: opacity;
     animation: game-flash 0.7s ease-out forwards;
   }
 }
