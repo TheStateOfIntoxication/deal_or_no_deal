@@ -1,5 +1,6 @@
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import type { ComputedRef, Ref } from 'vue'
+import { getBankerProfile } from '@/config/bankers'
 import { GAME_MODES, createModeGameConfig, getGameMode } from '@/config/modes'
 import type { GameModeDefinition } from '@/config/modes'
 import { PRAGMATIC_ADVICE_THRESHOLD, getPlayerPersona } from '@/config/personas'
@@ -7,7 +8,6 @@ import type { PlayerPersonaDefinition } from '@/config/personas'
 import {
   FINAL_REVEAL_MS,
   FLASH_MS,
-  GAMBLER_AUTO_NO_DEAL_MS,
   MILESTONE_HALF,
   MILESTONE_HIGH,
   MILESTONE_LOW,
@@ -60,6 +60,7 @@ const ERROR_KEYS: Record<EngineErrorEnum, MessageKey> = {
   [EngineErrorEnum.caseAlreadyOpened]: 'ErrorCaseAlreadyOpened',
   [EngineErrorEnum.playerCaseForbidden]: 'ErrorPlayerCaseForbidden',
   [EngineErrorEnum.openQuotaReached]: 'ErrorOpenQuotaReached',
+  [EngineErrorEnum.personaLocked]: 'ErrorPersonaLocked',
   [EngineErrorEnum.gameOver]: 'ErrorGameOver'
 }
 
@@ -93,13 +94,12 @@ export interface GameSessionApi {
   bestPrize: ComputedRef<number>
   flashGrade: Ref<AmountGradeEnum | PayoutGradeEnum | null>
   bankerLine: ComputedRef<string>
+  bankerName: ComputedRef<string>
   bankerExpression: ComputedRef<BankerExpression>
   bankerConfidence: ComputedRef<number>
   rage: ComputedRef<number>
   noDealCount: ComputedRef<number>
   offerMeta: ComputedRef<BankerOfferMetaState | null>
-  noDealLocked: ComputedRef<boolean>
-  autoNoDealSeconds: Ref<number>
   audienceMembers: Ref<AudienceMemberState[]>
   audienceRecommendations: Ref<AudienceRecommendationState[]>
   audienceReactions: Ref<AudienceReactionState[]>
@@ -169,8 +169,6 @@ export function useGameSession(): GameSessionApi {
   let flashTimer: number | undefined
   let revealTimer: number | undefined
   let resultTimer: number | undefined
-  let autoNoDealTimer: number | undefined
-  const autoNoDealSeconds = ref<number>(0)
   let lastModeOrder: GameModeEnum[] = []
 
   const mode = computed<GameModeDefinition | null>(() =>
@@ -182,7 +180,7 @@ export function useGameSession(): GameSessionApi {
   const modeLabel = computed(() => (mode.value ? t(mode.value.nameKey) : ''))
   const personaLabel = computed(() => (persona.value ? t(persona.value.nameKey) : ''))
   const topPrizeLabel = computed(
-    () => `${formatMoney(snapshot.value.topPrize)} ×${snapshot.value.topPrizeCount}`
+    () => `${formatMoney(snapshot.value.topPrize)} ×${snapshot.value.topPrizeRemaining}`
   )
 
   const phase = computed(() => snapshot.value.phase)
@@ -206,6 +204,7 @@ export function useGameSession(): GameSessionApi {
   const tableShaking = computed(() => flashGrade.value === AmountGradeEnum.disaster)
   const bestPrize = computed(() => store.state.record.bestPrize)
   const bankerLine = computed(() => t(bankerLineKey.value))
+  const bankerName = computed(() => t(getBankerProfile(snapshot.value.bankerId).nameKey))
   const bankerExpression = computed<BankerExpression>(() => {
     if (meltdownActive.value) return 'furious'
     const value = snapshot.value.rage
@@ -218,7 +217,6 @@ export function useGameSession(): GameSessionApi {
   const rage = computed(() => snapshot.value.rage)
   const noDealCount = computed(() => snapshot.value.noDealCount)
   const offerMeta = computed(() => snapshot.value.offerMeta)
-  const noDealLocked = computed(() => snapshot.value.noDealLocked)
   const hideSettledReveal = computed(
     () => phase.value === GamePhaseEnum.settled && !finalRevealed.value
   )
@@ -276,7 +274,7 @@ export function useGameSession(): GameSessionApi {
       case GamePhaseEnum.opening:
         return t('HintOpenCases', { count: snapshot.value.remainingToOpen })
       case GamePhaseEnum.offerPending:
-        if (noDealLocked.value) return t('OfferNoDealLocked')
+        if (!snapshot.value.canDeal) return t('HintGamblerContinue')
         return offerReady.value ? t('HintOfferPending') : t('HintBankerCalling')
       case GamePhaseEnum.swapPending:
         return t('HintSwapPending')
@@ -302,6 +300,9 @@ export function useGameSession(): GameSessionApi {
     if (persona.value.id === PlayerPersonaEnum.gambler) {
       return t('PersonaGamblerAdvice')
     }
+    if (persona.value.id === PlayerPersonaEnum.restorer) return t('PersonaRestorerAdvice')
+    if (persona.value.id === PlayerPersonaEnum.raiser) return t('PersonaRaiserAdvice')
+    if (persona.value.id === PlayerPersonaEnum.closer) return t('PersonaCloserAdvice')
     const mood = audienceMembers.value.length
       ? audienceMembers.value.reduce((sum, member) => sum + member.mood, 0) /
         audienceMembers.value.length
@@ -337,28 +338,7 @@ export function useGameSession(): GameSessionApi {
     }, FLASH_MS)
   }
 
-  const stopAutoNoDeal = (): void => {
-    if (autoNoDealTimer !== undefined) window.clearInterval(autoNoDealTimer)
-    autoNoDealTimer = undefined
-    autoNoDealSeconds.value = 0
-  }
-
-  const startAutoNoDeal = (): void => {
-    if (personaId.value !== PlayerPersonaEnum.gambler) return
-    if (phase.value !== GamePhaseEnum.offerPending) return
-    stopAutoNoDeal()
-    autoNoDealSeconds.value = Math.ceil(GAMBLER_AUTO_NO_DEAL_MS / 1000)
-    autoNoDealTimer = window.setInterval(() => {
-      autoNoDealSeconds.value -= 1
-      if (autoNoDealSeconds.value <= 0) {
-        stopAutoNoDeal()
-        handleNoDeal()
-      }
-    }, 1000)
-  }
-
   const clearTimers = (): void => {
-    stopAutoNoDeal()
     window.clearTimeout(holdTimer)
     window.clearTimeout(revealTimer)
     window.clearTimeout(resultTimer)
@@ -550,7 +530,6 @@ export function useGameSession(): GameSessionApi {
   }
 
   const handleDeal = (): void => {
-    stopAutoNoDeal()
     const result = engine.deal()
     if (!result.ok) {
       reject(result.error)
@@ -563,7 +542,6 @@ export function useGameSession(): GameSessionApi {
   }
 
   const handleNoDeal = (): void => {
-    stopAutoNoDeal()
     const result = engine.noDeal()
     if (!result.ok) {
       reject(result.error)
@@ -610,7 +588,6 @@ export function useGameSession(): GameSessionApi {
     finalRevealed.value = false
     resultReady.value = false
     resultDismissed.value = false
-    stopAutoNoDeal()
 
     if (value === GamePhaseEnum.offerPending) {
       holdTimer = window.setTimeout(() => {
@@ -626,7 +603,6 @@ export function useGameSession(): GameSessionApi {
               : 'offerNervous'
           )
         }
-        startAutoNoDeal()
       }, REVEAL_HOLD_MS)
       return
     }
@@ -692,13 +668,12 @@ export function useGameSession(): GameSessionApi {
     bestPrize,
     flashGrade,
     bankerLine,
+    bankerName,
     bankerExpression,
     bankerConfidence,
     rage,
     noDealCount,
     offerMeta,
-    noDealLocked,
-    autoNoDealSeconds,
     audienceMembers,
     audienceRecommendations,
     audienceReactions,

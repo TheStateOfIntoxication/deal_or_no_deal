@@ -59,6 +59,14 @@ const emit = defineEmits<{ (e: 'pick'): void }>()
     --persona-accent: #35c48c;
   }
 
+  &--gold {
+    --persona-accent: #f2c14e;
+  }
+
+  &--violet {
+    --persona-accent: #b79cff;
+  }
+
   &--selected {
     border-color: var(--persona-accent);
     box-shadow: 0 0 0 2px var(--persona-accent), 0 0 28px #00000055;

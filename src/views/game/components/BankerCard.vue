@@ -11,6 +11,7 @@ const props = defineProps<{
   rage: number
   noDealCount: number
   line: string
+  name: string
   topPrize: number
   plan: BankerPlanState | null
 }>()
@@ -49,7 +50,7 @@ const planText = computed(() => formatSignedPercent(props.plan?.delta ?? 0))
 
     <div class="banker-card__body">
       <div class="banker-card__head">
-        <span class="banker-card__name">{{ $t('BankerTitle') }}</span>
+        <span class="banker-card__name">{{ props.name }}</span>
         <span class="banker-card__confidence">
           {{ $t('BankerConfidence') }} {{ confidenceText }}
         </span>

@@ -1,4 +1,5 @@
 <script lang="ts" setup>
+import { formatMoney } from '@/utils/money'
 import type { AudienceMemberState, AudienceReactionState, AudienceRecommendationState, BankerExpression, BankerOfferMetaState, CaseState, GameSnapshot } from '../types'
 import AudienceRow from './AudienceRow.vue'
 import BankerCard from './BankerCard.vue'
@@ -13,6 +14,7 @@ const props = defineProps<{
   rage: number
   noDealCount: number
   bankerLine: string
+  bankerName: string
   offerVisible: boolean
   offerMeta: BankerOfferMetaState | null
   adviceText: string
@@ -20,7 +22,6 @@ const props = defineProps<{
   audienceMembers: AudienceMemberState[]
   audienceRecommendations: AudienceRecommendationState[]
   audienceReactions: AudienceReactionState[]
-  autoNoDealSeconds: number
   tableShaking: boolean
 }>()
 
@@ -39,12 +40,19 @@ const emit = defineEmits<{
       :rage="props.rage"
       :no-deal-count="props.noDealCount"
       :line="props.bankerLine"
+      :name="props.bankerName"
       :top-prize="props.snapshot.topPrize"
       :plan="props.offerVisible ? (props.offerMeta?.plan ?? null) : null"
     />
     <p v-if="props.adviceText" class="game-table__advice">
       <strong>{{ $t('AdviceTitle') }}</strong>
       <span>{{ props.adviceText }}</span>
+    </p>
+    <p v-if="props.snapshot.passiveNotice" class="game-table__passive">
+      {{ $t('PassiveRestorerNotice', {
+        caseNo: props.snapshot.passiveNotice.caseNo,
+        amount: formatMoney(props.snapshot.passiveNotice.amount)
+      }) }}
     </p>
     <OfferPanel
       :visible="props.offerVisible"
@@ -54,8 +62,7 @@ const emit = defineEmits<{
       :round-opened="props.snapshot.roundOpened"
       :breakdown="props.offerMeta?.breakdown ?? null"
       :plan="props.offerMeta?.plan ?? null"
-      :no-deal-locked="props.snapshot.noDealLocked"
-      :auto-no-deal-seconds="props.autoNoDealSeconds"
+      :can-deal="props.snapshot.canDeal"
       @deal="emit('deal')"
       @no-deal="emit('no-deal')"
     />
@@ -86,6 +93,16 @@ const emit = defineEmits<{
 
   &--shake {
     animation: game-table-shake 0.45s ease-in-out;
+  }
+
+  &__passive {
+    padding: 6px 10px;
+    border: 1px solid #b79cff66;
+    border-radius: 8px;
+    font-size: 12px;
+    text-align: center;
+    color: #d8c9ff;
+    background: #b79cff1a;
   }
 
   &__advice {

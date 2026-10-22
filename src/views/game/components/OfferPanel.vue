@@ -14,8 +14,7 @@ const props = defineProps<{
   roundOpened: RoundOpenedState[]
   breakdown: OfferBreakdownState | null
   plan: BankerPlanState | null
-  noDealLocked: boolean
-  autoNoDealSeconds: number
+  canDeal: boolean
 }>()
 
 const emit = defineEmits<{ (e: 'deal'): void; (e: 'noDeal'): void }>()
@@ -40,6 +39,7 @@ const ragePenaltyText = computed(() => formatPercent(ragePenalty.value))
 const planText = computed(() => formatSignedPercent(props.plan?.delta ?? 0))
 const personaText = computed(() => formatSignedPercent(props.breakdown?.persona ?? 0))
 const audienceText = computed(() => formatSignedPercent(props.breakdown?.audience ?? 0))
+const raiseText = computed(() => formatPercent(props.breakdown?.raise ?? 0))
 </script>
 
 <template>
@@ -59,17 +59,11 @@ const audienceText = computed(() => formatSignedPercent(props.breakdown?.audienc
         <strong class="offer-panel__amount">{{ formatMoney(offer) }}</strong>
       </div>
       <div class="offer-panel__actions">
-        <el-button type="danger" size="large" @click="emit('deal')">
+        <el-button v-if="canDeal" type="danger" size="large" @click="emit('deal')">
           {{ $t('BtnDeal') }}
         </el-button>
-        <el-button
-          type="primary"
-          size="large"
-          :disabled="noDealLocked"
-          :title="noDealLocked ? $t('OfferNoDealLocked') : ''"
-          @click="emit('noDeal')"
-        >
-          {{ $t('BtnNoDeal') }}
+        <el-button type="primary" size="large" @click="emit('noDeal')">
+          {{ $t(canDeal ? 'BtnNoDeal' : 'BtnContinue') }}
         </el-button>
       </div>
     </div>
@@ -85,9 +79,6 @@ const audienceText = computed(() => formatSignedPercent(props.breakdown?.audienc
       <span v-if="plan && plan.delta !== 0" class="offer-panel__tag offer-panel__tag--plan">
         {{ $t(BANKER_PLAN_LABEL_KEYS[plan.id]) }} {{ planText }}
       </span>
-      <span v-if="autoNoDealSeconds > 0" class="offer-panel__tag offer-panel__tag--auto">
-        {{ $t('OfferAutoNoDeal', { seconds: autoNoDealSeconds }) }}
-      </span>
       <span
         v-if="breakdown && breakdown.persona !== 0"
         class="offer-panel__tag offer-panel__tag--persona"
@@ -99,6 +90,9 @@ const audienceText = computed(() => formatSignedPercent(props.breakdown?.audienc
         class="offer-panel__tag offer-panel__tag--audience"
       >
         {{ $t('BankerAdjustAudience', { percent: audienceText }) }}
+      </span>
+      <span v-if="breakdown && breakdown.raise > 0" class="offer-panel__tag offer-panel__tag--raise">
+        {{ $t('BankerAdjustRaiser', { percent: raiseText }) }}
       </span>
       <span v-if="roundOpened.length > 0" class="offer-panel__opened">
         <span class="offer-panel__opened-label">{{ $t('LabelRoundOpened') }}</span>
@@ -232,10 +226,9 @@ const audienceText = computed(() => formatSignedPercent(props.breakdown?.audienc
       box-shadow: inset 0 0 0 1px #35c48c66;
     }
 
-    &--auto {
-      color: #ffd9dd;
-      background: #e35d6a33;
-      box-shadow: inset 0 0 0 1px #e35d6a66;
+    &--raise {
+      color: #08131f;
+      background: var(--dond-gold);
     }
   }
 

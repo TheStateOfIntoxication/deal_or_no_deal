@@ -8,6 +8,7 @@ defineProps<{
   resultVisible: boolean
   result: GameResultState | null
   bestPrize: number
+  highestOffer: number
   playerCaseNo: number
   otherCaseNo: number
 }>()
@@ -30,6 +31,7 @@ const emit = defineEmits<{
     :visible="resultVisible"
     :result="result"
     :best-prize="bestPrize"
+    :highest-offer="highestOffer"
     @restart="emit('restart')"
     @dismiss="emit('dismiss')"
   />

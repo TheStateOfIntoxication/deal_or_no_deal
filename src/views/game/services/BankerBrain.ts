@@ -1,4 +1,6 @@
 import { BANKER_PLAN_BASE_WEIGHTS, BANKER_PLAN_RULES } from '@/config/banker'
+import { DEFAULT_BANKER_PROFILE } from '@/config/bankers'
+import type { BankerProfile } from '@/config/bankers'
 import { BankerPlanEnum } from '@/types/game'
 import type { RandomSource } from '@/utils/random'
 
@@ -84,13 +86,17 @@ function deltaOf(plan: BankerPlanEnum, ctx: BankerPlanContext): number {
  */
 export function chooseBankerPlan(
   ctx: BankerPlanContext,
-  random: RandomSource
+  random: RandomSource,
+  profile: BankerProfile = DEFAULT_BANKER_PROFILE
 ): BankerPlanChoice {
   if (ctx.round === 9) {
     return { id: BankerPlanEnum.finalPush, delta: deltaOf(BankerPlanEnum.finalPush, ctx) }
   }
 
-  const weights: Record<BankerPlanEnum, number> = { ...BANKER_PLAN_BASE_WEIGHTS }
+  const weights: Record<BankerPlanEnum, number> = {
+    ...BANKER_PLAN_BASE_WEIGHTS,
+    ...profile.planWeights
+  }
   weights.rebate = ctx.lastRejected ? 3 : 0
   weights.generous = ctx.offerRatio < BANKER_PLAN_RULES.generousMaxOfferRatio ? 3 : 1
 

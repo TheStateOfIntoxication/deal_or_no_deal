@@ -39,13 +39,13 @@ const {
   bestPrize,
   flashGrade,
   bankerLine,
+  bankerName,
   bankerExpression,
   bankerConfidence,
   rage,
   noDealCount,
   offerMeta,
   audienceMembers,
-  autoNoDealSeconds,
   audienceRecommendations,
   audienceReactions,
   recommendedCaseNos,
@@ -71,6 +71,7 @@ const dialogState = computed(() => ({
   resultVisible: resultVisible.value,
   result: snapshot.value.result,
   bestPrize: bestPrize.value,
+  highestOffer: snapshot.value.highestOffer,
   playerCaseNo: playerCaseStats.value.caseNo ?? 0,
   otherCaseNo: gridCases.value[0]?.no ?? 0
 }))
@@ -126,6 +127,7 @@ const dialogState = computed(() => ({
           :rage="rage"
           :no-deal-count="noDealCount"
           :banker-line="bankerLine"
+          :banker-name="bankerName"
           :offer-visible="offerVisible"
           :offer-meta="offerMeta"
           :advice-text="adviceText"
@@ -133,7 +135,6 @@ const dialogState = computed(() => ({
           :audience-members="audienceMembers"
           :audience-recommendations="audienceRecommendations"
           :audience-reactions="audienceReactions"
-          :auto-no-deal-seconds="autoNoDealSeconds"
           :table-shaking="tableShaking"
           @select="handleSelect"
           @deal="handleDeal"

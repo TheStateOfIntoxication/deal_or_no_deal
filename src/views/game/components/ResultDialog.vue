@@ -17,6 +17,7 @@ const props = defineProps<{
   visible: boolean
   result: GameResultState | null
   bestPrize: number
+  highestOffer: number
 }>()
 
 const emit = defineEmits<{ (e: 'restart'): void; (e: 'dismiss'): void }>()
@@ -78,11 +79,22 @@ const payoutText = computed(() =>
           <dt>{{ $t('LabelSwap') }}</dt>
           <dd>{{ swappedText }}</dd>
         </div>
+        <div v-if="highestOffer > 0">
+          <dt>{{ $t('ResultHighestOffer') }}</dt>
+          <dd>{{ formatMoney(highestOffer) }}</dd>
+        </div>
         <div>
           <dt>{{ $t('ResultBestPrize') }}</dt>
           <dd>{{ formatMoney(bestPrize) }}</dd>
         </div>
       </dl>
+      <p
+        v-if="highestOffer > 0"
+        class="result-dialog__duel"
+        :class="{ 'result-dialog__duel--win': (result.prize ?? 0) > highestOffer }"
+      >
+        {{ (result.prize ?? 0) > highestOffer ? $t('ResultBeatBanker') : $t('ResultBankerWon') }}
+      </p>
       <div class="result-dialog__actions">
         <el-button size="large" plain @click="emit('dismiss')">
           {{ $t('BtnDismissResult') }}
@@ -177,6 +189,18 @@ const payoutText = computed(() =>
       font-size: 15px;
       color: var(--dond-text);
       font-variant-numeric: tabular-nums;
+    }
+  }
+
+  &__duel {
+    margin: 0 0 16px;
+    font-size: 12px;
+    text-align: center;
+    color: var(--dond-text-dim);
+
+    &--win {
+      color: var(--dond-gold);
+      text-shadow: 0 0 16px #f2c14e44;
     }
   }
 

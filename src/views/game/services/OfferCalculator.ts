@@ -19,6 +19,8 @@ export interface OfferBankerOptions {
   persona?: number
   /** 观众增量，可正可负 */
   audience?: number
+  /** 最终报价的金额加成（如抬价师 8%） */
+  raise?: number
 }
 
 /** 逐项乘数修正，供界面明示 */
@@ -29,6 +31,7 @@ export interface OfferBreakdown {
   plan: number
   persona: number
   audience: number
+  raise: number
   effective: number
   clamped: boolean
 }
@@ -114,6 +117,7 @@ export class OfferCalculator {
           plan: 0,
           persona: 0,
           audience: 0,
+          raise: 0,
           effective: 0,
           clamped: true
         }
@@ -136,6 +140,7 @@ export class OfferCalculator {
     const plan = banker?.plan ?? 0
     const persona = banker?.persona ?? 0
     const audience = banker?.audience ?? 0
+    const raise = banker?.raise ?? 0
     const effectiveMultiplier = Math.min(
       OFFER_MULTIPLIER_MAX,
       Math.max(OFFER_MULTIPLIER_MIN, multiplier + fear - ragePenalty + plan + persona + audience)
@@ -148,7 +153,7 @@ export class OfferCalculator {
       discounted *= 1 + (randomNext() * 2 - 1) * config.jitterRatio
     }
 
-    const raw = lower + upside * discounted
+    const raw = (lower + upside * discounted) * (1 + raise)
     const clampedRaw = Math.min(upper, Math.max(lower, raw))
     const floored = Math.max(0, Math.floor(clampedRaw))
     const amount = Math.min(upper, Math.max(lower, floored))
@@ -169,6 +174,7 @@ export class OfferCalculator {
         plan,
         persona,
         audience,
+        raise,
         effective: effectiveMultiplier,
         clamped: amount !== raw
       }

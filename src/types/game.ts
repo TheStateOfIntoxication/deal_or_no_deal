@@ -11,7 +11,10 @@ export enum GameModeEnum {
 export enum PlayerPersonaEnum {
   pragmatic = 'pragmatic',
   gambler = 'gambler',
-  conformist = 'conformist'
+  conformist = 'conformist',
+  restorer = 'restorer',
+  raiser = 'raiser',
+  closer = 'closer'
 }
 
 /** Banker's per-round plan */

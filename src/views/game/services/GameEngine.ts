@@ -1,13 +1,18 @@
 import { createGameConfig, TOTAL_ROUNDS } from '@/config/game'
 import type { GameConfig } from '@/config/game'
 import {
+  CLOSER_FINAL_RATE,
   CONFORMIST_AUDIENCE_CAP,
   GAMBLER_CONSOLATION_RATE,
   GAMBLER_TOP_MULTIPLIER,
   PRAGMATIC_GREED_THRESHOLD,
   PRAGMATIC_MAX_PENALTIES,
-  PRAGMATIC_PENALTY
+  PRAGMATIC_PENALTY,
+  RAISER_OFFER_BOOST,
+  RESTORER_MIN_REMAINING
 } from '@/config/personas'
+import { BankerProfileEnum, getBankerProfile } from '@/config/bankers'
+import type { BankerProfile } from '@/config/bankers'
 import { RAGE_MAX, RAGE_PER_NO_DEAL } from '@/config/presentation'
 import { createRandom, deriveSeed, shuffle } from '@/utils/random'
 import type { RandomSource } from '@/utils/random'
@@ -21,6 +26,7 @@ import type {
   EngineResult,
   GameResultState,
   GameSnapshot,
+  PassiveNoticeState,
   RoundLogState,
   RoundOpenedState
 } from '../types'
@@ -59,6 +65,9 @@ interface InternalState {
   greedPenaltiesUsed: number
   audienceDelta: number
   planHistory: BankerPlanEnum[]
+  passiveNotice: PassiveNoticeState | null
+  restorerUsed: boolean
+  highestOffer: number
 }
 
 /**
@@ -68,14 +77,20 @@ interface InternalState {
 export class GameEngine {
   private readonly config: GameConfig
   private readonly modeId: GameModeEnum
+  private readonly bankerProfile: BankerProfile
   private random: RandomSource
   private bankerRandom: RandomSource
   private configErrors: string[] = []
   private state: InternalState
 
-  constructor(config: GameConfig = createGameConfig(), modeId: GameModeEnum = GameModeEnum.classic) {
+  constructor(
+    config: GameConfig = createGameConfig(),
+    modeId: GameModeEnum = GameModeEnum.classic,
+    bankerProfileId: BankerProfileEnum = BankerProfileEnum.default
+  ) {
     this.config = config
     this.modeId = modeId
+    this.bankerProfile = getBankerProfile(bankerProfileId)
     this.random = createRandom(config.seed)
     this.bankerRandom = createRandom(deriveSeed(this.random.seed, 'banker'))
     this.state = GameEngine.createIdleState()
@@ -155,7 +170,10 @@ export class GameEngine {
       pendingGreedPenalty: false,
       greedPenaltiesUsed: 0,
       audienceDelta: 0,
-      planHistory: []
+      planHistory: [],
+      passiveNotice: null,
+      restorerUsed: false,
+      highestOffer: 0
     }
     return { ok: true }
   }
@@ -186,6 +204,7 @@ export class GameEngine {
     if (target.no === state.playerCaseNo) return GameEngine.reject(EngineErrorEnum.playerCaseForbidden)
     if (state.remainingToOpen <= 0) return GameEngine.reject(EngineErrorEnum.openQuotaReached)
 
+    state.passiveNotice = null
     target.opened = true
     state.remainingToOpen -= 1
     const amount = this.amountOf(target)
@@ -197,6 +216,7 @@ export class GameEngine {
     }
     state.roundOpened.push(entry)
     state.lastOpened = entry
+    this.maybeRestoreTopPrize()
     if (this.settleIfCertain()) return { ok: true }
     if (state.remainingToOpen === 0) this.closeRound()
     return { ok: true }
@@ -209,6 +229,10 @@ export class GameEngine {
     if (state.phase !== GamePhaseEnum.offerPending || state.currentOffer === null) {
       return GameEngine.reject(EngineErrorEnum.wrongPhase)
     }
+    if (state.personaId === PlayerPersonaEnum.gambler) {
+      return GameEngine.reject(EngineErrorEnum.personaLocked)
+    }
+
     const others = this.unopenedOtherCases()
     const playerAmount = this.playerCaseAmount()
     this.finishWithPrize(
@@ -307,6 +331,9 @@ export class GameEngine {
       phase: state.phase,
       modeId: this.modeId,
       personaId: state.personaId,
+      bankerId: this.bankerProfile.id,
+      passiveNotice: state.passiveNotice ? { ...state.passiveNotice } : null,
+      highestOffer: state.highestOffer,
       k: state.k,
       topPrizeCount: state.k,
       round: state.round,
@@ -316,9 +343,7 @@ export class GameEngine {
       cases,
       amountRows,
       currentOffer: state.currentOffer,
-      noDealLocked:
-        state.phase === GamePhaseEnum.offerPending &&
-        state.personaId === PlayerPersonaEnum.gambler,
+      canDeal: state.personaId !== PlayerPersonaEnum.gambler,
       remainingAmounts: unopenedCases.map((item) => this.amountOf(item)),
       remainingCaseCount: unopenedCases.length,
       topPrize: this.config.topPrize,
@@ -351,6 +376,29 @@ export class GameEngine {
     return this.random.seed
   }
 
+  /** 补天者：最高奖全部离场且仍有至少 3 箱时，把一个非玩家剩余最大金额补成新顶奖（每局一次） */
+  private maybeRestoreTopPrize(): void {
+    const state = this.state
+    if (state.personaId !== PlayerPersonaEnum.restorer || state.restorerUsed) return
+    const unopened = state.cases.filter((item) => !item.opened)
+    if (unopened.length < RESTORER_MIN_REMAINING) return
+    const topRemaining = unopened.filter((item) => this.amountOf(item) === this.config.topPrize).length
+    if (topRemaining > 0) return
+
+    const candidates = unopened.filter((item) => item.no !== state.playerCaseNo)
+    if (candidates.length === 0) return
+    const largest = Math.max(...candidates.map((item) => this.amountOf(item)))
+    const targets = candidates.filter((item) => this.amountOf(item) === largest)
+    const target = targets[Math.floor(this.random.next() * targets.length)] as InternalCase
+    state.pool[target.poolIndex] = this.config.topPrize
+    state.restorerUsed = true
+    state.passiveNotice = {
+      personaId: PlayerPersonaEnum.restorer,
+      caseNo: target.no,
+      amount: this.config.topPrize
+    }
+  }
+
   /** 本轮开箱完成：银行家选计划 → 计算报价并进入决策阶段（R-5.2.6、R-5.3.1） */
   private closeRound(): void {
     const state = this.state
@@ -367,7 +415,7 @@ export class GameEngine {
       offerRatio: ev > 0 ? baseOffer.amount / ev : 1,
       planHistory: state.planHistory
     }
-    const plan = chooseBankerPlan(planContext, this.bankerRandom)
+    const plan = chooseBankerPlan(planContext, this.bankerRandom, this.bankerProfile)
 
     let personaDelta = 0
     if (state.personaId === PlayerPersonaEnum.pragmatic && state.pendingGreedPenalty) {
@@ -385,12 +433,14 @@ export class GameEngine {
         rage: state.rage,
         plan: plan.delta,
         persona: personaDelta,
-        audience: audienceDelta
+        audience: audienceDelta,
+        raise: state.personaId === PlayerPersonaEnum.raiser ? RAISER_OFFER_BOOST : 0
       }
     )
 
     const planState: BankerPlanState = { id: plan.id, delta: plan.delta }
     state.currentOffer = offer.amount
+    state.highestOffer = Math.max(state.highestOffer, offer.amount)
     state.offerMeta = {
       fear: offer.fear,
       ragePenalty: offer.ragePenalty,
@@ -424,11 +474,19 @@ export class GameEngine {
     const state = this.state
     const isGamblerFinal =
       state.personaId === PlayerPersonaEnum.gambler && decidedBy !== 'deal'
-    const prize = isGamblerFinal
-      ? basePrize === this.config.topPrize
-        ? Math.floor(basePrize * GAMBLER_TOP_MULTIPLIER)
-        : Math.floor(basePrize * GAMBLER_CONSOLATION_RATE)
-      : basePrize
+    let prize = basePrize
+    if (isGamblerFinal) {
+      prize =
+        basePrize === this.config.topPrize
+          ? Math.floor(basePrize * GAMBLER_TOP_MULTIPLIER)
+          : Math.floor(basePrize * GAMBLER_CONSOLATION_RATE)
+    } else if (
+      state.personaId === PlayerPersonaEnum.closer &&
+      decidedBy !== 'deal' &&
+      basePrize !== this.config.topPrize
+    ) {
+      prize = Math.floor(basePrize * CLOSER_FINAL_RATE)
+    }
     const personaBonus = prize - basePrize
     state.result = {
       basePrize,
@@ -544,7 +602,10 @@ export class GameEngine {
       pendingGreedPenalty: false,
       greedPenaltiesUsed: 0,
       audienceDelta: 0,
-      planHistory: []
+      planHistory: [],
+      passiveNotice: null,
+      restorerUsed: false,
+      highestOffer: 0
     }
   }
 }

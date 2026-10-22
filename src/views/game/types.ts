@@ -1,4 +1,5 @@
 import type { MessageKey } from '@/language'
+import { BankerProfileEnum } from '@/config/bankers'
 import {
   AudienceReactionEnum,
   AudienceTraitEnum,
@@ -36,6 +37,7 @@ export enum EngineErrorEnum {
   caseAlreadyOpened = 'caseAlreadyOpened',
   playerCaseForbidden = 'playerCaseForbidden',
   openQuotaReached = 'openQuotaReached',
+  personaLocked = 'personaLocked',
   gameOver = 'gameOver'
 }
 
@@ -129,6 +131,8 @@ export interface OfferBreakdownState {
   persona: number
   /** 观众增量（可正可负） */
   audience: number
+  /** 最终报价金额加成（抬价师） */
+  raise: number
   /** 最终生效乘数 */
   effective: number
   /** 是否因边界被钳制 */
@@ -179,6 +183,13 @@ export interface AudienceReactionState {
   lineKey: MessageKey
 }
 
+/** 补天者被动触发提示 */
+export interface PassiveNoticeState {
+  personaId: PlayerPersonaEnum
+  caseNo: number
+  amount: number
+}
+
 /** 供界面渲染的只读快照 */
 export interface GameSnapshot {
   phase: GamePhaseEnum
@@ -186,6 +197,8 @@ export interface GameSnapshot {
   modeId: GameModeEnum
   /** 本局角色 */
   personaId: PlayerPersonaEnum
+  /** 本局银行家档案 */
+  bankerId: BankerProfileEnum
   /** 顶奖数量（经典 = k，巨奖 = 1） */
   k: number
   /** 顶奖数量别名，新代码优先使用 */
@@ -197,8 +210,12 @@ export interface GameSnapshot {
   cases: CaseState[]
   amountRows: AmountRowState[]
   currentOffer: number | null
-  /** 赌徒：No Deal 不可选，报价自动跳过 */
-  noDealLocked: boolean
+  /** 是否显示 Deal 按钮；赌徒没有回头路，隐藏 Deal */
+  canDeal: boolean
+  /** 角色被动触发提示；无则为 null */
+  passiveNotice: PassiveNoticeState | null
+  /** 本局银行家最高报价（用于结算复盘） */
+  highestOffer: number
   /** 未打开箱子对应的金额多重集，含玩家箱（R-6.1.1、R-9.5） */
   remainingAmounts: number[]
   /** 未打开的箱子数（含玩家箱） */
