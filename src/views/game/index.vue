@@ -74,7 +74,12 @@ const dialogState = computed(() => ({
   bestPrize: bestPrize.value,
   highestOffer: snapshot.value.highestOffer,
   playerCaseNo: playerCaseStats.value.caseNo ?? 0,
-  otherCaseNo: gridCases.value[0]?.no ?? 0
+  otherCaseNo: gridCases.value[0]?.no ?? 0,
+  remainingAmounts: snapshot.value.remainingAmounts,
+  topPrizeRemaining: snapshot.value.topPrizeRemaining,
+  lastOffer: snapshot.value.logs.at(-1)?.offer ?? 0,
+  bankerConfidence: snapshot.value.bankerConfidence,
+  personaId: snapshot.value.personaId
 }))
 </script>
 

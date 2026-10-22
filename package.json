@@ -9,7 +9,8 @@
     "build": "vue-tsc --noEmit && vite build",
     "preview": "vite preview",
     "tsc": "vue-tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "simulate": "vite-node scripts/simulate.ts"
   },
   "dependencies": {
     "element-plus": "^2.14.7",

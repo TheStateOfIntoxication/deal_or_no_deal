@@ -377,7 +377,7 @@ export class GameEngine {
     return this.random.seed
   }
 
-  /** 补天者：最高奖全部离场且仍有至少 3 箱时，把一个非玩家剩余最大金额补成新顶奖（每局一次） */
+  /** 捡漏王：最高奖全部离场且仍有至少 5 箱时，把一个非玩家剩余最大金额补成新顶奖（每局一次） */
   private maybeRestoreTopPrize(): void {
     const state = this.state
     if (state.personaId !== PlayerPersonaEnum.restorer || state.restorerUsed) return

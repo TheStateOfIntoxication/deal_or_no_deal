@@ -133,7 +133,7 @@ export interface OfferBreakdownState {
   persona: number
   /** 观众增量（可正可负） */
   audience: number
-  /** 最终报价金额加成（抬价师） */
+  /** 最终报价金额加成（关系户） */
   raise: number
   /** 最终生效乘数 */
   effective: number
@@ -185,7 +185,7 @@ export interface AudienceReactionState {
   lineKey: MessageKey
 }
 
-/** 补天者被动触发提示 */
+/** 捡漏王被动触发提示 */
 export interface PassiveNoticeState {
   personaId: PlayerPersonaEnum
   caseNo: number

@@ -37,6 +37,12 @@ export const CHARITY_BANKER_PROFILE: BankerProfile = {
 
 export const BANKER_PROFILES = [DEFAULT_BANKER_PROFILE, CHARITY_BANKER_PROFILE]
 export const GAME_BANKER_IDS: BankerProfileEnum[] = BANKER_PROFILES.map((profile) => profile.id)
+
+/** Rotation weights: charity is rarer than the default banker */
+export const BANKER_ROTATION_WEIGHTS: Record<BankerProfileEnum, number> = {
+  [BankerProfileEnum.default]: 4,
+  [BankerProfileEnum.charity]: 1
+}
 const BANKER_PROFILE_MAP = new Map(BANKER_PROFILES.map((profile) => [profile.id, profile]))
 
 export function getBankerProfile(id: BankerProfileEnum): BankerProfile {

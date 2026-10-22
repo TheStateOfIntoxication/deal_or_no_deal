@@ -19,7 +19,7 @@ export interface OfferBankerOptions {
   persona?: number
   /** 观众增量，可正可负 */
   audience?: number
-  /** 最终报价的金额加成（如抬价师 8%） */
+  /** 最终报价的金额加成（如关系户 8%） */
   raise?: number
   /** 覆盖本轮基础乘数（慈善家取曲线最高档） */
   baseMultiplier?: number

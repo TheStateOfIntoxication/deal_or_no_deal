@@ -1,4 +1,4 @@
-import { GAME_BANKER_IDS } from '@/config/bankers'
+import { BANKER_ROTATION_WEIGHTS, GAME_BANKER_IDS } from '@/config/bankers'
 import type { BankerProfileEnum } from '@/config/bankers'
 import { createRandom, shuffle } from '@/utils/random'
 import type { RandomSource } from '@/utils/random'
@@ -18,7 +18,12 @@ export class BankerRotation {
 
   next(): BankerProfileEnum {
     if (this.queue.length === 0) {
-      this.queue = shuffle(GAME_BANKER_IDS, this.random)
+      const bag: BankerProfileEnum[] = []
+      for (const id of GAME_BANKER_IDS) {
+        const weight = BANKER_ROTATION_WEIGHTS[id] ?? 1
+        for (let index = 0; index < weight; index += 1) bag.push(id)
+      }
+      this.queue = shuffle(bag, this.random)
       if (this.queue.length > 1 && this.queue[0] === this.last) {
         const first = this.queue.shift() as BankerProfileEnum
         this.queue.push(first)
