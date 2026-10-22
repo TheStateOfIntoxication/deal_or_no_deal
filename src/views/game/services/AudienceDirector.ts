@@ -1,13 +1,8 @@
 import {
-  AUDIENCE_CONFORMIST_BONUS,
   AUDIENCE_MAX_COUNT,
   AUDIENCE_MIN_COUNT,
   AUDIENCE_TEMPLATES
 } from '@/config/audience'
-import {
-  CONFORMIST_AUDIENCE_CAP,
-  CONFORMIST_AUDIENCE_SCALE
-} from '@/config/personas'
 import {
   AUDIENCE_GUILT_SHARE,
   AUDIENCE_HAPPY_SHARE,
@@ -15,10 +10,7 @@ import {
   AUDIENCE_MOOD_MIN,
   AUDIENCE_MOOD_START
 } from '@/config/presentation'
-import {
-  AudienceReactionEnum,
-  PlayerPersonaEnum
-} from '@/types/game'
+import { AudienceReactionEnum } from '@/types/game'
 import { createRandom, shuffle } from '@/utils/random'
 import type { RandomSource } from '@/utils/random'
 import type {
@@ -35,17 +27,17 @@ import type {
 export class AudienceDirector {
   private readonly random: RandomSource
   private readonly members: AudienceMemberState[]
-  private readonly persona: PlayerPersonaEnum
+  private readonly recommendationCount: number
   private recommendations: AudienceRecommendationState[] = []
 
-  constructor(seed: number, persona: PlayerPersonaEnum) {
+  constructor(seed: number, extraMembers = 0, recommendationCount = 1) {
     this.random = createRandom(seed)
-    this.persona = persona
+    this.recommendationCount = Math.max(1, recommendationCount)
 
     const baseCount =
       AUDIENCE_MIN_COUNT +
       Math.floor(this.random.next() * (AUDIENCE_MAX_COUNT - AUDIENCE_MIN_COUNT + 1))
-    const count = baseCount + (persona === PlayerPersonaEnum.conformist ? AUDIENCE_CONFORMIST_BONUS : 0)
+    const count = Math.min(AUDIENCE_TEMPLATES.length, baseCount + Math.max(0, extraMembers))
     const templates = shuffle(AUDIENCE_TEMPLATES, this.random).slice(0, count)
     this.members = templates.map((template, index) => ({
       id: index + 1,
@@ -65,15 +57,15 @@ export class AudienceDirector {
     return this.members.reduce((sum, member) => sum + member.mood, 0) / this.members.length
   }
 
-  /** Conformist offer delta; 0 for every other persona */
-  getOfferDelta(): number {
-    if (this.persona !== PlayerPersonaEnum.conformist) return 0
-    const raw = (this.getAverageMood() - AUDIENCE_MOOD_START) * CONFORMIST_AUDIENCE_SCALE
-    return Math.min(CONFORMIST_AUDIENCE_CAP, Math.max(-CONFORMIST_AUDIENCE_CAP, raw))
+  /** Apply a one-off mood change from a persona ability */
+  adjustMood(delta: number): void {
+    for (const member of this.members) {
+      member.mood = Math.min(AUDIENCE_MOOD_MAX, Math.max(AUDIENCE_MOOD_MIN, member.mood + delta))
+    }
   }
 
   /**
-   * One recommendation per round (two for the conformist).
+   * One recommendation per round by default; the conformist asks for two.
    * Only eligibility (opened / player case) and case numbers are used.
    */
   beginRound(cases: readonly CaseState[], playerCaseNo: number | null): AudienceRecommendationState[] {
@@ -85,8 +77,7 @@ export class AudienceDirector {
       return []
     }
 
-    const desired = this.persona === PlayerPersonaEnum.conformist ? 2 : 1
-    const count = Math.min(desired, eligibleCases.length, this.members.length)
+    const count = Math.min(this.recommendationCount, eligibleCases.length, this.members.length)
     const speakers = shuffle(this.members, this.random).slice(0, count)
     const caseNumbers = shuffle(eligibleCases, this.random)
 

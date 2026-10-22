@@ -46,14 +46,44 @@ export const CONSPIRATOR_BANKER_PROFILE: BankerProfile = {
   lineTone: 'sharp'
 }
 
-export const BANKER_PROFILES = [DEFAULT_BANKER_PROFILE, CHARITY_BANKER_PROFILE, CONSPIRATOR_BANKER_PROFILE]
+export const COLLECTOR_BANKER_PROFILE: BankerProfile = {
+  id: BankerProfileEnum.collector,
+  nameKey: 'BankerCollectorName',
+  traitKey: 'BankerCollectorTrait',
+  emoji: '🏺',
+  tone: 'violet',
+  planWeights: {},
+  offerMode: 'curve',
+  lineTone: 'sharp'
+}
+
+export const CASINO_BANKER_PROFILE: BankerProfile = {
+  id: BankerProfileEnum.casino,
+  nameKey: 'BankerCasinoName',
+  traitKey: 'BankerCasinoTrait',
+  emoji: '🎰',
+  tone: 'gold',
+  planWeights: {},
+  offerMode: 'curve',
+  lineTone: 'sharp'
+}
+
+export const BANKER_PROFILES = [
+  DEFAULT_BANKER_PROFILE,
+  CHARITY_BANKER_PROFILE,
+  CONSPIRATOR_BANKER_PROFILE,
+  COLLECTOR_BANKER_PROFILE,
+  CASINO_BANKER_PROFILE
+]
 export const GAME_BANKER_IDS: BankerProfileEnum[] = BANKER_PROFILES.map((profile) => profile.id)
 
-/** Rotation weights: charity is rarer than the default banker */
+/** Rotation weights: default remains the most common banker */
 export const BANKER_ROTATION_WEIGHTS: Record<BankerProfileEnum, number> = {
   [BankerProfileEnum.default]: 4,
   [BankerProfileEnum.charity]: 1,
-  [BankerProfileEnum.conspirator]: 1
+  [BankerProfileEnum.conspirator]: 1,
+  [BankerProfileEnum.collector]: 1,
+  [BankerProfileEnum.casino]: 1
 }
 const BANKER_PROFILE_MAP = new Map(BANKER_PROFILES.map((profile) => [profile.id, profile]))
 

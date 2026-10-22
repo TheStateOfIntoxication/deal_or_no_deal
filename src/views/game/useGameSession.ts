@@ -3,7 +3,7 @@ import type { ComputedRef, Ref } from 'vue'
 import { BankerProfileEnum, getBankerProfile } from '@/config/bankers'
 import { GAME_MODES, createModeGameConfig, getGameMode } from '@/config/modes'
 import type { GameModeDefinition } from '@/config/modes'
-import { PRAGMATIC_ADVICE_THRESHOLD, getPlayerPersona } from '@/config/personas'
+import { getPlayerPersona } from '@/config/personas'
 import type { PlayerPersonaDefinition } from '@/config/personas'
 import {
   FINAL_REVEAL_MS,
@@ -25,6 +25,7 @@ import {
   AmountGradeEnum,
   GameModeEnum,
   PayoutGradeEnum,
+  PersonaActionEnum,
   PlayerPersonaEnum
 } from '@/types/game'
 import { formatMoney } from '@/utils/money'
@@ -35,6 +36,7 @@ import { GameEngine } from './services/GameEngine'
 import { AudienceDirector } from './services/AudienceDirector'
 import { BankerRotation } from './services/BankerRotation'
 import { CaseTierEnum, createConspiratorHint } from './services/ConspiratorHint'
+import { getPersonaStrategy } from './services/personas'
 import { buildModeDeck } from './services/ModeDeckBuilder'
 import type { ModeCardState } from './services/ModeDeckBuilder'
 import { useAudio } from './useAudio'
@@ -63,6 +65,7 @@ const ERROR_KEYS: Record<EngineErrorEnum, MessageKey> = {
   [EngineErrorEnum.playerCaseForbidden]: 'ErrorPlayerCaseForbidden',
   [EngineErrorEnum.openQuotaReached]: 'ErrorOpenQuotaReached',
   [EngineErrorEnum.personaLocked]: 'ErrorPersonaLocked',
+  [EngineErrorEnum.actionUnavailable]: 'ErrorActionUnavailable',
   [EngineErrorEnum.gameOver]: 'ErrorGameOver'
 }
 
@@ -119,6 +122,8 @@ export interface GameSessionApi {
   handleCaseHover: (caseNo: number) => void
   handleDeal: () => void
   handleNoDeal: () => void
+  handlePersonaAction: (action: PersonaActionEnum) => void
+  handleSideBet: () => void
   handleSwap: (shouldSwap: boolean) => void
   dismissResult: () => void
 }
@@ -301,26 +306,18 @@ export function useGameSession(): GameSessionApi {
     const ev = OfferCalculator.arithmeticMean(snapshot.value.remainingAmounts)
     return ev > 0 ? offer / ev : 0
   })
+  const audienceMood = computed(() => {
+    if (audienceMembers.value.length === 0) return 3
+    return audienceMembers.value.reduce((sum, member) => sum + member.mood, 0) /
+      audienceMembers.value.length
+  })
   const adviceText = computed<string>(() => {
     if (phase.value !== GamePhaseEnum.offerPending || !persona.value) return ''
-    if (persona.value.id === PlayerPersonaEnum.pragmatic) {
-      return offerRatio.value >= PRAGMATIC_ADVICE_THRESHOLD
-        ? t('PersonaPragmaticAdviceDeal')
-        : t('PersonaPragmaticAdviceHold')
-    }
-    if (persona.value.id === PlayerPersonaEnum.gambler) {
-      return t('PersonaGamblerAdvice')
-    }
-    if (persona.value.id === PlayerPersonaEnum.restorer) return t('PersonaRestorerAdvice')
-    if (persona.value.id === PlayerPersonaEnum.raiser) return t('PersonaRaiserAdvice')
-    if (persona.value.id === PlayerPersonaEnum.closer) return t('PersonaCloserAdvice')
-    const mood = audienceMembers.value.length
-      ? audienceMembers.value.reduce((sum, member) => sum + member.mood, 0) /
-        audienceMembers.value.length
-      : 3
-    if (mood >= 3.5) return t('PersonaConformistAdviceHold')
-    if (mood <= 2.5) return t('PersonaConformistAdviceDeal')
-    return t('PersonaConformistAdviceWait')
+    const key = getPersonaStrategy(persona.value.id).getAdviceKey?.({
+      offerRatio: offerRatio.value,
+      audienceMood: audienceMood.value
+    })
+    return t(key ?? persona.value.adviceHoldKey)
   })
   const recommendedCaseNos = computed(() =>
     audienceRecommendations.value.map((item) => item.caseNo)
@@ -356,10 +353,12 @@ export function useGameSession(): GameSessionApi {
     window.clearTimeout(flashTimer)
   }
 
-  /** 把观众情绪同步给引擎；只有从众角色会真正影响报价 */
+  /** 把观众情绪同步给引擎；角色策略决定是否把它转成报价修正 */
   const syncAudience = (): void => {
     audienceMembers.value = audienceDirector?.getMembers() ?? []
-    engine.setAudienceDelta(audienceDirector?.getOfferDelta() ?? 0)
+    const strategy = personaId.value ? getPersonaStrategy(personaId.value) : null
+    const mood = audienceDirector?.getAverageMood() ?? 3
+    engine.setAudienceDelta(strategy?.getAudienceDelta?.(mood) ?? 0)
   }
 
   const startAudienceRound = (): void => {
@@ -488,9 +487,11 @@ export function useGameSession(): GameSessionApi {
     clearError()
     setupPhase.value = SetupPhaseEnum.playing
     if (mode.value?.features.audience) {
+      const strategy = getPersonaStrategy(personaId.value)
       audienceDirector = new AudienceDirector(
         deriveSeed(sessionSeed.value, 'audience'),
-        personaId.value
+        strategy.audienceExtraMembers,
+        strategy.audienceRecommendationCount ?? 1
       )
       syncAudience()
     }
@@ -608,6 +609,32 @@ export function useGameSession(): GameSessionApi {
     else if (currentRage >= RAGE_TIER_ANGRY) pickBankerLine('noDealAngry')
     else if (currentRage >= RAGE_TIER_ANNOYED) pickBankerLine('noDealAnnoyed')
     else pickBankerLine('noDealCalm')
+  }
+
+  /** 主持人的造势/圆场：引擎改报价和怒气，会话层落观众情绪 */
+  const handlePersonaAction = (action: PersonaActionEnum): void => {
+    const result = engine.usePersonaAction(action)
+    if (!result.ok) {
+      reject(result.error)
+      return
+    }
+    if (audienceDirector && result.audienceMoodDelta !== 0) {
+      audienceDirector.adjustMood(result.audienceMoodDelta)
+    }
+    clearError()
+    syncAudience()
+    refresh()
+  }
+
+  /** 赌场老板：押下一箱不是顶奖 */
+  const handleSideBet = (): void => {
+    const result = engine.placeSideBet()
+    if (!result.ok) {
+      reject(result.error)
+      return
+    }
+    clearError()
+    refresh()
   }
 
   const handleSwap = (shouldSwap: boolean): void => {
@@ -738,6 +765,8 @@ export function useGameSession(): GameSessionApi {
     handleCaseHover,
     handleDeal,
     handleNoDeal,
+    handlePersonaAction,
+    handleSideBet,
     handleSwap,
     dismissResult
   }

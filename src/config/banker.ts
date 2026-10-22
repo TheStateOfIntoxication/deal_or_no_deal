@@ -32,3 +32,13 @@ export const BANKER_PLAN_BASE_WEIGHTS: Record<BankerPlanEnum, number> = {
 
 /** Gambler honor bonus when the final prize beats the banker highest offer */
 export const BANKER_HONOR_RATE = 0.1
+
+/** Collector: final offer factor while at least one top prize remains */
+export const COLLECTOR_TOP_PRESENT_FACTOR = 0.96
+/** Collector: final offer factor after all top prizes are gone */
+export const COLLECTOR_TOP_GONE_FACTOR = 1.08
+
+/** Casino boss: side bet limits and payout factors */
+export const CASINO_SIDE_BET_MAX_USES = 2
+export const CASINO_SIDE_BET_WIN_FACTOR = 1.06
+export const CASINO_SIDE_BET_LOSS_FACTOR = 0.92

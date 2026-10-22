@@ -1,5 +1,6 @@
 <script lang="ts" setup>
 import { computed } from 'vue'
+import type { MessageKey } from '@/language'
 import { formatMoney } from '@/utils/money'
 import { formatPercent, formatSignedPercent } from '@/utils/percent'
 import { BANKER_PLAN_LABEL_KEYS } from '../bankerLines'
@@ -15,6 +16,7 @@ const props = defineProps<{
   trait: string
   topPrize: number
   plan: BankerPlanState | null
+  quirkLabelKey: MessageKey | null
 }>()
 
 const confidenceText = computed(() => formatPercent(props.confidence, 0))
@@ -58,6 +60,9 @@ const planText = computed(() => formatSignedPercent(props.plan?.delta ?? 0))
         </span>
         <span v-if="plan && plan.delta !== 0" class="banker-card__plan">
           {{ $t(BANKER_PLAN_LABEL_KEYS[plan.id]) }} {{ planText }}
+        </span>
+        <span v-if="quirkLabelKey" class="banker-card__quirk">
+          {{ $t(quirkLabelKey) }}
         </span>
       </div>
       <p class="banker-card__bet">
@@ -254,6 +259,15 @@ const planText = computed(() => formatSignedPercent(props.plan?.delta ?? 0))
     font-size: 10px;
     color: #08131f;
     background: #e08b3a;
+  }
+
+  &__quirk {
+    padding: 1px 7px;
+    border-radius: 999px;
+    font-size: 10px;
+    color: #d8c9ff;
+    background: #b79cff26;
+    box-shadow: inset 0 0 0 1px #b79cff66;
   }
 
   &__bet {

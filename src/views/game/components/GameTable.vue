@@ -1,8 +1,12 @@
 <script lang="ts" setup>
+import { computed } from 'vue'
 import { formatMoney } from '@/utils/money'
+import { formatSignedPercent } from '@/utils/percent'
+import type { PersonaActionEnum } from '@/types/game'
 import type { AudienceMemberState, AudienceReactionState, AudienceRecommendationState, BankerExpression, BankerOfferMetaState, CaseState, GameSnapshot } from '../types'
 import AudienceRow from './AudienceRow.vue'
 import BankerCard from './BankerCard.vue'
+import BankerSideBet from './BankerSideBet.vue'
 import CaseGrid from './CaseGrid.vue'
 import OfferPanel from './OfferPanel.vue'
 
@@ -31,7 +35,13 @@ const emit = defineEmits<{
   (e: 'hover', caseNo: number): void
   (e: 'deal'): void
   (e: 'no-deal'): void
+  (e: 'persona-action', action: PersonaActionEnum): void
+  (e: 'side-bet'): void
 }>()
+
+const stackBonusText = computed(() =>
+  formatSignedPercent(props.snapshot.personaState.stackBonus)
+)
 </script>
 
 <template>
@@ -46,10 +56,21 @@ const emit = defineEmits<{
       :trait="props.bankerTrait"
       :top-prize="props.snapshot.topPrize"
       :plan="props.offerVisible ? (props.offerMeta?.plan ?? null) : null"
+      :quirk-label-key="props.snapshot.bankerState.quirkLabelKey"
+    />
+    <BankerSideBet
+      :side-bet="props.snapshot.bankerState.sideBet"
+      @bet="emit('side-bet')"
     />
     <p v-if="props.adviceText" class="game-table__advice">
       <strong>{{ $t('AdviceTitle') }}</strong>
       <span>{{ props.adviceText }}</span>
+    </p>
+    <p v-if="props.snapshot.personaState.stacks > 0" class="game-table__persona-status">
+      {{ $t('PersonaHoldoutStatus', {
+        stacks: props.snapshot.personaState.stacks,
+        percent: stackBonusText
+      }) }}
     </p>
     <p v-if="props.snapshot.passiveNotice" class="game-table__passive">
       {{ $t('PassiveRestorerNotice', {
@@ -65,9 +86,13 @@ const emit = defineEmits<{
       :round-opened="props.snapshot.roundOpened"
       :breakdown="props.offerMeta?.breakdown ?? null"
       :plan="props.offerMeta?.plan ?? null"
+      :quirk-label-key="props.offerMeta?.quirkLabelKey ?? null"
       :can-deal="props.snapshot.canDeal"
+      :persona-state="props.snapshot.personaState"
+      :persona-actions="props.snapshot.personaActions"
       @deal="emit('deal')"
       @no-deal="emit('no-deal')"
+      @persona-action="emit('persona-action', $event)"
     />
     <CaseGrid
       :cases="props.gridCases"
@@ -123,6 +148,15 @@ const emit = defineEmits<{
       flex: 0 0 auto;
       color: var(--dond-gold);
     }
+  }
+
+  &__persona-status {
+    padding: 5px 10px;
+    border: 1px solid #e35d6a66;
+    border-radius: 8px;
+    font-size: 11px;
+    color: #ff9aa4;
+    background: #e35d6a12;
   }
 }
 

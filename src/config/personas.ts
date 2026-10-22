@@ -34,6 +34,22 @@ export const RAISER_OFFER_BOOST = 0.08
 export const CLOSER_FINAL_RATE = 0.5
 /** Restorer: only trigger while at least this many cases remain (before the final two) */
 export const RESTORER_MIN_REMAINING = 5
+/** Host: one-off offer multiplier when hyping the crowd */
+export const HOST_HYPE_OFFER = 1.05
+/** Host: one-off offer multiplier when calming the banker */
+export const HOST_CALM_OFFER = 0.98
+/** Host: rage gained/lost by each action */
+export const HOST_HYPE_RAGE = 20
+export const HOST_CALM_RAGE = 25
+/** Host: audience mood gained/lost by each action */
+export const HOST_HYPE_AUDIENCE = 2
+export const HOST_CALM_AUDIENCE = -1
+/** Holdout: only low offers create resolve stacks */
+export const HOLDOUT_OFFER_THRESHOLD = 0.55
+/** Holdout: each stack adds this multiplier delta to future offers */
+export const HOLDOUT_STACK_BONUS = 0.03
+/** Holdout: maximum resolve stacks per game */
+export const HOLDOUT_MAX_STACKS = 3
 
 export const PLAYER_PERSONAS: PlayerPersonaDefinition[] = [
   {
@@ -95,6 +111,26 @@ export const PLAYER_PERSONAS: PlayerPersonaDefinition[] = [
     emoji: '🧾',
     tone: 'blue',
     difficulty: 2
+  },
+  {
+    id: PlayerPersonaEnum.host,
+    nameKey: 'PersonaHostName',
+    traitKey: 'PersonaHostTrait',
+    adviceDealKey: 'PersonaHostAdvice',
+    adviceHoldKey: 'PersonaHostAdvice',
+    emoji: '🎤',
+    tone: 'gold',
+    difficulty: 2
+  },
+  {
+    id: PlayerPersonaEnum.holdout,
+    nameKey: 'PersonaHoldoutName',
+    traitKey: 'PersonaHoldoutTrait',
+    adviceDealKey: 'PersonaHoldoutAdvice',
+    adviceHoldKey: 'PersonaHoldoutAdvice',
+    emoji: '🧱',
+    tone: 'red',
+    difficulty: 1
   }
 ]
 

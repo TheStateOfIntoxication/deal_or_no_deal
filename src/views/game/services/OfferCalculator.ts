@@ -33,6 +33,8 @@ export interface OfferBreakdown {
   plan: number
   persona: number
   audience: number
+  quirk: number
+  action: number
   raise: number
   effective: number
   clamped: boolean
@@ -125,6 +127,8 @@ export class OfferCalculator {
           plan: 0,
           persona: 0,
           audience: 0,
+          quirk: 0,
+          action: 0,
           raise: 0,
           effective: 0,
           clamped: true
@@ -182,6 +186,8 @@ export class OfferCalculator {
         plan,
         persona,
         audience,
+        quirk: 0,
+        action: 0,
         raise,
         effective: effectiveMultiplier,
         clamped: amount !== raw

@@ -1,39 +1,43 @@
 import { createGameConfig, TOTAL_ROUNDS } from '@/config/game'
 import type { GameConfig } from '@/config/game'
-import {
-  CLOSER_FINAL_RATE,
-  CONFORMIST_AUDIENCE_CAP,
-  GAMBLER_CONSOLATION_RATE,
-  GAMBLER_TOP_MULTIPLIER,
-  PRAGMATIC_GREED_THRESHOLD,
-  PRAGMATIC_MAX_PENALTIES,
-  PRAGMATIC_PENALTY,
-  RAISER_OFFER_BOOST,
-  RESTORER_MIN_REMAINING
-} from '@/config/personas'
-import { BANKER_HONOR_RATE } from '@/config/banker'
 import { BankerProfileEnum, getBankerProfile } from '@/config/bankers'
 import type { BankerProfile } from '@/config/bankers'
 import { RAGE_MAX, RAGE_PER_NO_DEAL } from '@/config/presentation'
+import type { MessageKey } from '@/language'
 import { createRandom, deriveSeed, shuffle } from '@/utils/random'
 import type { RandomSource } from '@/utils/random'
-import { BankerPlanEnum, GameModeEnum, PlayerPersonaEnum } from '@/types/game'
+import { BankerPlanEnum, GameModeEnum, PersonaActionEnum, PlayerPersonaEnum } from '@/types/game'
 import { EngineErrorEnum, GamePhaseEnum } from '../types'
 import type {
   AmountRowState,
   BankerOfferMetaState,
   BankerPlanState,
+  BankerSideBetState,
+  BankerState,
   CaseState,
+  EngineActionResult,
   EngineResult,
   GameResultState,
   GameSnapshot,
   PassiveNoticeState,
+  PersonaActionState,
+  PersonaState,
   RoundLogState,
   RoundOpenedState
 } from '../types'
 import { AmountGrader } from './AmountGrader'
 import { chooseBankerPlan } from './BankerBrain'
 import type { BankerPlanContext } from './BankerBrain'
+import { createBankerRuntimeState, getBankerStrategy } from './bankers'
+import type { BankerQuirkContext, BankerRuntimeState, BankerStrategy } from './bankers/types'
+import { getPersonaStrategy } from './personas'
+import type {
+  PersonaActionContext,
+  PersonaCaseContext,
+  PersonaPrizeContext,
+  PersonaRuntimeState,
+  PersonaStrategy
+} from './personas/types'
 import { OfferCalculator } from './OfferCalculator'
 import { PoolBuilder } from './PoolBuilder'
 
@@ -60,25 +64,27 @@ interface InternalState {
   logs: RoundLogState[]
   result: GameResultState | null
   personaId: PlayerPersonaEnum
+  personaState: PersonaRuntimeState
+  bankerState: BankerRuntimeState
+  personaActionLabelKey: MessageKey | null
   lastRejected: boolean
   rejectStreak: number
-  pendingGreedPenalty: boolean
-  greedPenaltiesUsed: number
   audienceDelta: number
   planHistory: BankerPlanEnum[]
   passiveNotice: PassiveNoticeState | null
-  restorerUsed: boolean
   highestOffer: number
 }
 
 /**
- * 《一掷千金》规则状态机（纯类，不依赖 Vue / DOM）
- * 规则依据：.pi/docx/需求文档.md v1.1 §3–§9
+ * 《一掷千金》规则状态机。角色/银行家行为通过策略注册表注入，
+ * 引擎只负责状态迁移、边界钳制和事件顺序。
  */
 export class GameEngine {
   private readonly config: GameConfig
   private readonly modeId: GameModeEnum
   private readonly bankerProfile: BankerProfile
+  private readonly bankerStrategy: BankerStrategy
+  private personaStrategy: PersonaStrategy
   private random: RandomSource
   private bankerRandom: RandomSource
   private configErrors: string[] = []
@@ -92,15 +98,14 @@ export class GameEngine {
     this.config = config
     this.modeId = modeId
     this.bankerProfile = getBankerProfile(bankerProfileId)
+    this.bankerStrategy = getBankerStrategy(bankerProfileId)
+    this.personaStrategy = getPersonaStrategy(PlayerPersonaEnum.pragmatic)
     this.random = createRandom(config.seed)
     this.bankerRandom = createRandom(deriveSeed(this.random.seed, 'banker'))
-    this.state = GameEngine.createIdleState()
+    this.state = GameEngine.createIdleState(this.personaStrategy)
   }
 
-  /**
-   * 生成开局摇奖的候选 k：配置区间的等概率排列，供玩家抽取（R-4.1.1、R-4.1.7）
-   * 每次调用都会重新洗乱；指定 seed 时排列可复现
-   */
+  /** 生成开局摇奖的候选 k；每局顺序由引擎随机源决定 */
   createKDraw(): number[] {
     if (!this.config.randomKEnabled) return []
     const candidates: number[] = []
@@ -108,17 +113,18 @@ export class GameEngine {
     return shuffle(candidates, this.random)
   }
 
-  /** 开局：校验配置 → 确定顶奖数量 → 构建金额池 → 洗乱并绑定箱子（R-4） */
+  /** 开局：校验配置 → 确定顶奖数量 → 构建并洗牌 → 进入选箱 */
   start(
     topCount?: number,
     personaId: PlayerPersonaEnum = PlayerPersonaEnum.pragmatic
   ): EngineResult {
     this.configErrors = PoolBuilder.validate(this.config)
     if (this.configErrors.length > 0) {
-      this.state = GameEngine.createIdleState()
+      this.state = GameEngine.createIdleState(this.personaStrategy)
       return { ok: false, error: EngineErrorEnum.configInvalid }
     }
 
+    this.personaStrategy = getPersonaStrategy(personaId)
     this.random = createRandom(this.config.seed)
     this.bankerRandom = createRandom(deriveSeed(this.random.seed, 'banker'))
     const k = this.config.randomKEnabled
@@ -129,22 +135,17 @@ export class GameEngine {
       ? this.config.kMax
       : this.config.totalCases - 1
     if (!Number.isInteger(k) || k < minCount || k > maxCount) {
-      this.state = GameEngine.createIdleState()
+      this.state = GameEngine.createIdleState(this.personaStrategy)
       return { ok: false, error: EngineErrorEnum.invalidDraw }
     }
 
     const pool = shuffle(PoolBuilder.build(this.config, k), this.random)
-    // 内部不变式：奖池总数与顶奖数必须与抽到的 k 一致（防展示层不一致）
-    // 若基础金额表本身含与顶奖相等的金额（异常配置），只能校验总数
     const topPrizeCount = pool.filter((amount) => amount === this.config.topPrize).length
     const baseBelowTop = this.config.baseAmounts.every(
       (amount) => amount < this.config.topPrize
     )
-    if (
-      pool.length !== this.config.totalCases ||
-      (baseBelowTop && topPrizeCount !== k)
-    ) {
-      this.state = GameEngine.createIdleState()
+    if (pool.length !== this.config.totalCases || (baseBelowTop && topPrizeCount !== k)) {
+      this.state = GameEngine.createIdleState(this.personaStrategy)
       this.configErrors = ['pool']
       return { ok: false, error: EngineErrorEnum.configInvalid }
     }
@@ -166,24 +167,28 @@ export class GameEngine {
       logs: [],
       result: null,
       personaId,
+      personaState: this.personaStrategy.createState(),
+      bankerState: createBankerRuntimeState(),
+      personaActionLabelKey: null,
       lastRejected: false,
       rejectStreak: 0,
-      pendingGreedPenalty: false,
-      greedPenaltiesUsed: 0,
       audienceDelta: 0,
       planHistory: [],
       passiveNotice: null,
-      restorerUsed: false,
       highestOffer: 0
     }
     return { ok: true }
   }
 
-  /** 玩家选箱，进入第 1 轮（R-4.4） */
+  /** 选定玩家箱，进入第 1 轮 */
   selectPlayerCase(caseNo: number): EngineResult {
     const state = this.state
-    if (state.phase !== GamePhaseEnum.waitingPlayerCase) return GameEngine.reject(EngineErrorEnum.wrongPhase)
-    if (!state.cases.some((item) => item.no === caseNo)) return GameEngine.reject(EngineErrorEnum.unknownCase)
+    if (state.phase !== GamePhaseEnum.waitingPlayerCase) {
+      return GameEngine.reject(EngineErrorEnum.wrongPhase)
+    }
+    if (!state.cases.some((item) => item.no === caseNo)) {
+      return GameEngine.reject(EngineErrorEnum.unknownCase)
+    }
 
     state.playerCaseNo = caseNo
     state.round = 1
@@ -193,17 +198,25 @@ export class GameEngine {
     return { ok: true }
   }
 
-  /** 打开一个非玩家箱；本轮配额用尽后立即生成本轮报价（R-5.2、R-5.3.1） */
+  /** 开一个箱子；本轮开满后自动进入报价 */
   openCase(caseNo: number): EngineResult {
     const state = this.state
-    if (state.phase === GamePhaseEnum.settled) return GameEngine.reject(EngineErrorEnum.gameOver)
-    if (state.phase !== GamePhaseEnum.opening) return GameEngine.reject(EngineErrorEnum.wrongPhase)
+    if (state.phase === GamePhaseEnum.settled) {
+      return GameEngine.reject(EngineErrorEnum.gameOver)
+    }
+    if (state.phase !== GamePhaseEnum.opening) {
+      return GameEngine.reject(EngineErrorEnum.wrongPhase)
+    }
 
     const target = state.cases.find((item) => item.no === caseNo)
     if (!target) return GameEngine.reject(EngineErrorEnum.unknownCase)
     if (target.opened) return GameEngine.reject(EngineErrorEnum.caseAlreadyOpened)
-    if (target.no === state.playerCaseNo) return GameEngine.reject(EngineErrorEnum.playerCaseForbidden)
-    if (state.remainingToOpen <= 0) return GameEngine.reject(EngineErrorEnum.openQuotaReached)
+    if (target.no === state.playerCaseNo) {
+      return GameEngine.reject(EngineErrorEnum.playerCaseForbidden)
+    }
+    if (state.remainingToOpen <= 0) {
+      return GameEngine.reject(EngineErrorEnum.openQuotaReached)
+    }
 
     state.passiveNotice = null
     target.opened = true
@@ -217,20 +230,23 @@ export class GameEngine {
     }
     state.roundOpened.push(entry)
     state.lastOpened = entry
-    this.maybeRestoreTopPrize()
+    this.resolveSideBet(amount)
+    this.applyPersonaCaseEffect()
     if (this.settleIfCertain()) return { ok: true }
     if (state.remainingToOpen === 0) this.closeRound()
     return { ok: true }
   }
 
-  /** 接受报价：立即结束，奖金为报价金额（R-5.3.4） */
+  /** 接受报价 */
   deal(): EngineResult {
     const state = this.state
-    if (state.phase === GamePhaseEnum.settled) return GameEngine.reject(EngineErrorEnum.gameOver)
+    if (state.phase === GamePhaseEnum.settled) {
+      return GameEngine.reject(EngineErrorEnum.gameOver)
+    }
     if (state.phase !== GamePhaseEnum.offerPending || state.currentOffer === null) {
       return GameEngine.reject(EngineErrorEnum.wrongPhase)
     }
-    if (state.personaId === PlayerPersonaEnum.gambler) {
+    if (!this.personaStrategy.canDeal) {
       return GameEngine.reject(EngineErrorEnum.personaLocked)
     }
 
@@ -248,29 +264,32 @@ export class GameEngine {
     return { ok: true }
   }
 
-  /** 拒绝报价：进入下一轮；第 9 轮拒绝后进入终局交换，不再出价（R-5.3.5、R-7.1.1） */
+  /** 拒绝报价；第 9 轮后进入终局交换或直接结算 */
   noDeal(): EngineResult {
     const state = this.state
-    if (state.phase === GamePhaseEnum.settled) return GameEngine.reject(EngineErrorEnum.gameOver)
-    if (state.phase !== GamePhaseEnum.offerPending) return GameEngine.reject(EngineErrorEnum.wrongPhase)
-    // 稳重的“贪心惩罚”：拒绝明显高于期望的报价，下一轮会被压价
-    const ev = OfferCalculator.arithmeticMean(this.remainingAmounts())
-    if (
-      state.personaId === PlayerPersonaEnum.pragmatic &&
-      state.currentOffer !== null &&
-      ev > 0 &&
-      state.currentOffer / ev >= PRAGMATIC_GREED_THRESHOLD &&
-      state.greedPenaltiesUsed < PRAGMATIC_MAX_PENALTIES
-    ) {
-      state.pendingGreedPenalty = true
+    if (state.phase === GamePhaseEnum.settled) {
+      return GameEngine.reject(EngineErrorEnum.gameOver)
     }
+    if (state.phase !== GamePhaseEnum.offerPending || state.currentOffer === null) {
+      return GameEngine.reject(EngineErrorEnum.wrongPhase)
+    }
+
+    const offer = state.currentOffer
+    this.personaStrategy.onNoDeal?.(
+      this.personaOfferContext(state, offer),
+      state.personaState
+    )
 
     state.currentOffer = null
     state.offerMeta = null
+    state.personaActionLabelKey = null
     state.noDealCount += 1
     state.lastRejected = true
     state.rejectStreak += 1
     state.rage = Math.min(RAGE_MAX, state.rage + RAGE_PER_NO_DEAL)
+    state.bankerState.sideBetOutcome = null
+    state.bankerState.sideBetPending = false
+    state.bankerState.sideBetRound = 0
     if (state.round < TOTAL_ROUNDS) {
       state.round += 1
       state.remainingToOpen = this.config.openSequence[state.round - 1]
@@ -287,13 +306,71 @@ export class GameEngine {
     return { ok: true }
   }
 
-  /** 终局交换决策（R-7.3） */
+  /** 终局交换决策 */
   swap(shouldSwap: boolean): EngineResult {
     const state = this.state
-    if (state.phase === GamePhaseEnum.settled) return GameEngine.reject(EngineErrorEnum.gameOver)
-    if (state.phase !== GamePhaseEnum.swapPending) return GameEngine.reject(EngineErrorEnum.wrongPhase)
+    if (state.phase === GamePhaseEnum.settled) {
+      return GameEngine.reject(EngineErrorEnum.gameOver)
+    }
+    if (state.phase !== GamePhaseEnum.swapPending) {
+      return GameEngine.reject(EngineErrorEnum.wrongPhase)
+    }
 
     this.settleByCase(shouldSwap)
+    return { ok: true }
+  }
+
+  /** 使用角色主动能力，返回需要由会话层落到观众系统的增量 */
+  usePersonaAction(action: PersonaActionEnum): EngineActionResult {
+    const state = this.state
+    if (state.phase !== GamePhaseEnum.offerPending || state.currentOffer === null) {
+      return { ok: false, error: EngineErrorEnum.wrongPhase }
+    }
+    const actions = this.getPersonaActions()
+    if (!actions.some((item) => item.id === action && item.enabled)) {
+      return { ok: false, error: EngineErrorEnum.actionUnavailable }
+    }
+
+    const result = this.personaStrategy.performAction?.(
+      action,
+      this.personaOfferContext(state, state.currentOffer),
+      state.personaState
+    )
+    if (!result) return { ok: false, error: EngineErrorEnum.actionUnavailable }
+
+    const before = state.currentOffer
+    const { lower, upper } = this.remainingRange()
+    state.currentOffer = GameEngine.clampAmount(before * result.offerMultiplier, lower, upper)
+    state.highestOffer = Math.max(state.highestOffer, state.currentOffer)
+    state.rage = Math.min(RAGE_MAX, Math.max(0, state.rage + result.rageDelta))
+    state.personaActionLabelKey = result.labelKey
+    if (state.offerMeta) {
+      state.offerMeta.breakdown.action = before > 0 ? state.currentOffer / before - 1 : 0
+    }
+    return { ok: true, audienceMoodDelta: result.audienceMoodDelta }
+  }
+
+  /** 赌场老板的边注：押下一箱不是顶奖 */
+  placeSideBet(): EngineResult {
+    const state = this.state
+    const rule = this.bankerStrategy.sideBet
+    if (!rule) return GameEngine.reject(EngineErrorEnum.actionUnavailable)
+    if (state.phase !== GamePhaseEnum.opening) {
+      return GameEngine.reject(EngineErrorEnum.wrongPhase)
+    }
+    if (
+      state.remainingToOpen <= 0 ||
+      state.bankerState.sideBetPending ||
+      state.bankerState.sideBetRound === state.round ||
+      state.bankerState.sideBetUsed >= rule.maxUses ||
+      this.topPrizeRemaining() <= 0
+    ) {
+      return GameEngine.reject(EngineErrorEnum.actionUnavailable)
+    }
+
+    state.bankerState.sideBetPending = true
+    state.bankerState.sideBetOutcome = null
+    state.bankerState.sideBetRound = state.round
     return { ok: true }
   }
 
@@ -328,12 +405,19 @@ export class GameEngine {
       eliminated: openedIndexes.has(id)
     }))
 
+    const personaActions = this.getPersonaActions()
+    const personaState = this.getPersonaState(personaActions)
+    const bankerState = this.getBankerState(topPrizeRemaining)
+
     return {
       phase: state.phase,
       modeId: this.modeId,
       personaId: state.personaId,
       bankerId: this.bankerProfile.id,
       passiveNotice: state.passiveNotice ? { ...state.passiveNotice } : null,
+      personaState,
+      personaActions: personaActions.map((item) => ({ ...item })),
+      bankerState,
       highestOffer: state.highestOffer,
       k: state.k,
       topPrizeCount: state.k,
@@ -344,7 +428,7 @@ export class GameEngine {
       cases,
       amountRows,
       currentOffer: state.currentOffer,
-      canDeal: state.personaId !== PlayerPersonaEnum.gambler,
+      canDeal: this.personaStrategy.canDeal,
       remainingAmounts: unopenedCases.map((item) => this.amountOf(item)),
       remainingCaseCount: unopenedCases.length,
       topPrize: this.config.topPrize,
@@ -367,51 +451,112 @@ export class GameEngine {
     }
   }
 
-  /** 配置错误码，供界面提示（空数组表示配置合法） */
   getConfigErrors(): string[] {
     return [...this.configErrors]
   }
 
-  /** 本局实际使用的随机种子，便于复现（R-10） */
   getSeed(): number {
     return this.random.seed
   }
 
-  /** 仅阴谋家悬停提示使用：读取指定箱的真实金额，不进入快照/UI */
+  /** 阴谋家低语使用的只读金额查询 */
   getCaseAmountForHint(caseNo: number): number | null {
     const target = this.state.cases.find((item) => item.no === caseNo)
     return target ? this.amountOf(target) : null
   }
 
-  /** 捡漏王：最高奖全部离场且仍有至少 5 箱时，把一个非玩家剩余最大金额补成新顶奖（每局一次） */
-  private maybeRestoreTopPrize(): void {
-    const state = this.state
-    if (state.personaId !== PlayerPersonaEnum.restorer || state.restorerUsed) return
-    const unopened = state.cases.filter((item) => !item.opened)
-    if (unopened.length < RESTORER_MIN_REMAINING) return
-    const topRemaining = unopened.filter((item) => this.amountOf(item) === this.config.topPrize).length
-    if (topRemaining > 0) return
+  /** 会话层同步观众情绪；角色策略会在报价时消费它 */
+  setAudienceDelta(delta: number): void {
+    this.state.audienceDelta = Number.isFinite(delta) ? delta : 0
+  }
 
-    const candidates = unopened.filter((item) => item.no !== state.playerCaseNo)
-    if (candidates.length === 0) return
-    const largest = Math.max(...candidates.map((item) => this.amountOf(item)))
-    const targets = candidates.filter((item) => this.amountOf(item) === largest)
-    const target = targets[Math.floor(this.random.next() * targets.length)] as InternalCase
-    state.pool[target.poolIndex] = this.config.topPrize
-    state.restorerUsed = true
-    state.passiveNotice = {
-      personaId: PlayerPersonaEnum.restorer,
-      caseNo: target.no,
-      amount: this.config.topPrize
+  private personaOfferContext(state: InternalState, offer: number): PersonaActionContext {
+    const remainingAmounts = this.remainingAmounts()
+    return {
+      round: state.round,
+      offer,
+      ev: OfferCalculator.arithmeticMean(remainingAmounts),
+      remainingAmounts,
+      topPrize: this.config.topPrize,
+      rage: state.rage
     }
   }
 
-  /** 本轮开箱完成：银行家选计划 → 计算报价并进入决策阶段（R-5.2.6、R-5.3.1） */
+  private getPersonaActions(): PersonaActionState[] {
+    const state = this.state
+    if (state.phase !== GamePhaseEnum.offerPending || state.currentOffer === null) return []
+    return (
+      this.personaStrategy.getActions?.(
+        this.personaOfferContext(state, state.currentOffer),
+        state.personaState
+      ) ?? []
+    ).map((item) => ({ ...item }))
+  }
+
+  private getPersonaState(actions: readonly PersonaActionState[]): PersonaState {
+    const state = this.state
+    return {
+      actionAvailable: actions.some((item) => item.enabled),
+      actionUsed: state.personaState.actionUsed,
+      actionLabelKey: state.personaActionLabelKey,
+      stacks: state.personaState.stacks,
+      stackBonus: this.personaStrategy.getStackBonus?.(state.personaState) ?? 0
+    }
+  }
+
+  private getBankerState(topPrizeRemaining: number): BankerState {
+    const state = this.state
+    const quirkContext = this.bankerQuirkContext(
+      this.remainingAmounts(),
+      state.currentOffer ?? 0,
+      topPrizeRemaining
+    )
+    const quirkLabelKey = this.bankerStrategy.getStatusKey?.(quirkContext) ?? null
+    const rule = this.bankerStrategy.sideBet
+    if (!rule) return { quirkLabelKey, sideBet: null }
+
+    const sideBet: BankerSideBetState = {
+      available:
+        state.phase === GamePhaseEnum.opening &&
+        state.remainingToOpen > 0 &&
+        !state.bankerState.sideBetPending &&
+        state.bankerState.sideBetRound !== state.round &&
+        state.bankerState.sideBetUsed < rule.maxUses &&
+        topPrizeRemaining > 0,
+      used: state.bankerState.sideBetUsed,
+      maxUses: rule.maxUses,
+      pending: state.bankerState.sideBetPending,
+      outcome: state.bankerState.sideBetOutcome,
+      winFactor: rule.winFactor,
+      lossFactor: rule.lossFactor,
+      labelKey: rule.labelKey,
+      winLabelKey: rule.winLabelKey,
+      lossLabelKey: rule.lossLabelKey
+    }
+    return { quirkLabelKey, sideBet }
+  }
+
+  private bankerQuirkContext(
+    amounts: readonly number[],
+    offer: number,
+    topPrizeRemaining: number
+  ): BankerQuirkContext {
+    return {
+      offer,
+      round: this.state.round,
+      topPrize: this.config.topPrize,
+      topPrizeRemaining,
+      lower: amounts.length > 0 ? Math.min(...amounts) : 0,
+      upper: amounts.length > 0 ? Math.max(...amounts) : 0
+    }
+  }
+
   private closeRound(): void {
     const state = this.state
     const remaining = this.remainingAmounts()
     const ev = OfferCalculator.arithmeticMean(remaining)
-    const topProb = remaining.filter((amount) => amount === this.config.topPrize).length / remaining.length
+    const topProb =
+      remaining.filter((amount) => amount === this.config.topPrize).length / remaining.length
     const baseOffer = OfferCalculator.calculate(remaining, state.round, this.config)
     const planContext: BankerPlanContext = {
       round: state.round,
@@ -424,12 +569,9 @@ export class GameEngine {
     }
     const plan = chooseBankerPlan(planContext, this.bankerRandom, this.bankerProfile)
 
-    let personaDelta = 0
-    if (state.personaId === PlayerPersonaEnum.pragmatic && state.pendingGreedPenalty) {
-      personaDelta = -PRAGMATIC_PENALTY
-    }
-    const audienceDelta = state.personaId === PlayerPersonaEnum.conformist ? state.audienceDelta : 0
-
+    const offerContext = this.personaOfferContext(state, baseOffer.amount)
+    const personaDelta = this.personaStrategy.getOfferDelta?.(offerContext, state.personaState) ?? 0
+    const raise = this.personaStrategy.getRaise?.(offerContext, state.personaState) ?? 0
     const offer = OfferCalculator.calculate(
       remaining,
       state.round,
@@ -440,39 +582,91 @@ export class GameEngine {
         rage: state.rage,
         plan: plan.delta,
         persona: personaDelta,
-        audience: audienceDelta,
-        raise: state.personaId === PlayerPersonaEnum.raiser ? RAISER_OFFER_BOOST : 0,
+        audience: state.audienceDelta,
+        raise,
         baseMultiplier:
           this.bankerProfile.offerMode === 'highest'
             ? OfferCalculator.maxMultiplier(this.config)
             : undefined
       }
     )
+    this.personaStrategy.onOfferComputed?.(offerContext, state.personaState)
+
+    const quirk = this.bankerStrategy.getQuirk?.(
+      this.bankerQuirkContext(remaining, offer.amount, this.topPrizeRemaining()),
+      state.bankerState
+    )
+    let amount = offer.amount
+    let quirkDelta = 0
+    if (quirk) {
+      const lower = remaining.length > 0 ? Math.min(...remaining) : 0
+      const upper = remaining.length > 0 ? Math.max(...remaining) : 0
+      amount = GameEngine.clampAmount(offer.amount * quirk.factor, lower, upper)
+      quirkDelta = offer.amount > 0 ? amount / offer.amount - 1 : 0
+      offer.breakdown.quirk = quirkDelta
+      offer.breakdown.clamped = offer.breakdown.clamped || amount !== offer.amount * quirk.factor
+    }
 
     const planState: BankerPlanState = { id: plan.id, delta: plan.delta }
-    state.currentOffer = offer.amount
-    state.highestOffer = Math.max(state.highestOffer, offer.amount)
+    state.currentOffer = amount
+    state.highestOffer = Math.max(state.highestOffer, amount)
+    state.personaActionLabelKey = null
     state.offerMeta = {
       fear: offer.fear,
       ragePenalty: offer.ragePenalty,
       confidence: 1 - offer.probability,
-      breakdown: offer.breakdown,
-      plan: planState
+      breakdown: { ...offer.breakdown, quirk: quirkDelta },
+      plan: planState,
+      quirkLabelKey: quirk?.labelKey ?? null
     }
     state.planHistory = [...state.planHistory, plan.id].slice(-3)
-    if (state.pendingGreedPenalty) {
-      state.greedPenaltiesUsed += 1
-      state.pendingGreedPenalty = false
-    }
     state.logs.push({
       round: state.round,
       openedAmounts: state.roundOpened.map((entry) => entry.amount),
-      offer: offer.amount
+      offer: state.currentOffer
     })
     state.phase = GamePhaseEnum.offerPending
   }
 
-  /** 结算唯一入口：赌徒加成统一在这里应用，覆盖 Deal / 开箱 / 提前结算 */
+  private resolveSideBet(amount: number): void {
+    const state = this.state
+    const rule = this.bankerStrategy.sideBet
+    if (!rule || !state.bankerState.sideBetPending) return
+    state.bankerState.sideBetPending = false
+    state.bankerState.sideBetUsed += 1
+    state.bankerState.sideBetOutcome =
+      amount === this.config.topPrize ? 'lose' : 'win'
+  }
+
+  private applyPersonaCaseEffect(): void {
+    const state = this.state
+    const unopenedCases = state.cases.filter((item) => !item.opened)
+    const context: PersonaCaseContext = {
+      topPrize: this.config.topPrize,
+      playerCaseNo: state.playerCaseNo,
+      remainingCases: unopenedCases.map((item) => ({
+        caseNo: item.no,
+        amount: this.amountOf(item),
+        isPlayerCase: item.no === state.playerCaseNo
+      }))
+    }
+    const effect = this.personaStrategy.onCaseOpened?.(context, state.personaState)
+    if (!effect || effect.candidateCaseNos.length === 0) return
+
+    const targetNo =
+      effect.candidateCaseNos[
+        Math.floor(this.random.next() * effect.candidateCaseNos.length)
+      ]
+    const target = state.cases.find((item) => item.no === targetNo)
+    if (!target) return
+    state.pool[target.poolIndex] = effect.amount
+    state.passiveNotice = {
+      personaId: state.personaId,
+      caseNo: target.no,
+      amount: effect.amount
+    }
+  }
+
   private finishWithPrize(
     basePrize: number,
     decidedBy: 'deal' | 'case' | 'certainty',
@@ -483,37 +677,22 @@ export class GameEngine {
     otherCaseAmount: number | null
   ): void {
     const state = this.state
-    const isGamblerFinal =
-      state.personaId === PlayerPersonaEnum.gambler && decidedBy !== 'deal'
-    let prize = basePrize
-    if (isGamblerFinal) {
-      prize =
-        basePrize === this.config.topPrize
-          ? Math.floor(basePrize * GAMBLER_TOP_MULTIPLIER)
-          : Math.floor(basePrize * GAMBLER_CONSOLATION_RATE)
-    } else if (
-      state.personaId === PlayerPersonaEnum.closer &&
-      decidedBy !== 'deal' &&
-      basePrize !== this.config.topPrize
-    ) {
-      prize = Math.floor(basePrize * CLOSER_FINAL_RATE)
+    const prizeContext: PersonaPrizeContext = {
+      basePrize,
+      decidedBy,
+      topPrize: this.config.topPrize,
+      highestOffer: state.highestOffer
     }
-    const personaPrize = prize
-    let honorBonus = 0
-    if (
-      state.personaId === PlayerPersonaEnum.gambler &&
-      decidedBy !== 'deal' &&
-      state.highestOffer > 0 &&
-      personaPrize > state.highestOffer
-    ) {
-      honorBonus = Math.floor(personaPrize * BANKER_HONOR_RATE)
-      prize = personaPrize + honorBonus
-    }
-    const personaBonus = personaPrize - basePrize
+    const personaResult = this.personaStrategy.getPrize?.(
+      prizeContext,
+      state.personaState
+    ) ?? { prize: basePrize, honorBonus: 0 }
+    const personaBonus = personaResult.prize - basePrize
+    const prize = personaResult.prize + personaResult.honorBonus
     state.result = {
       basePrize,
       personaBonus,
-      honorBonus,
+      honorBonus: personaResult.honorBonus,
       prize,
       payoutGrade: AmountGrader.payoutGradeOf(prize, state.pool, this.config.topPrize),
       decidedBy,
@@ -527,7 +706,6 @@ export class GameEngine {
     state.phase = GamePhaseEnum.settled
   }
 
-  /** 终局打开持有箱子结算（R-7.3.4–R-7.3.6） */
   private settleByCase(swapped: boolean): void {
     const state = this.state
     const playerCaseAmount = this.playerCaseAmount()
@@ -548,10 +726,6 @@ export class GameEngine {
     )
   }
 
-  /**
-   * 剩余金额全部相等 → 玩家箱金额已唯一确定，立即结算（R-5.2.7）
-   * 典型场景：所有低于顶奖的箱子都已开出，玩家箱必定是顶奖
-   */
   private settleIfCertain(): boolean {
     const amounts = this.remainingAmounts()
     if (amounts.length === 0) return false
@@ -573,10 +747,18 @@ export class GameEngine {
     return true
   }
 
-  /** 从众角色：把观众平均情绪换算成报价修正 */
-  setAudienceDelta(delta: number): void {
-    const clamped = Math.min(CONFORMIST_AUDIENCE_CAP, Math.max(-CONFORMIST_AUDIENCE_CAP, delta))
-    this.state.audienceDelta = this.state.personaId === PlayerPersonaEnum.conformist ? clamped : 0
+  private topPrizeRemaining(): number {
+    return this.state.cases.filter(
+      (item) => !item.opened && this.amountOf(item) === this.config.topPrize
+    ).length
+  }
+
+  private remainingRange(): { lower: number; upper: number } {
+    const amounts = this.remainingAmounts()
+    return {
+      lower: amounts.length > 0 ? Math.min(...amounts) : 0,
+      upper: amounts.length > 0 ? Math.max(...amounts) : 0
+    }
   }
 
   private amountOf(item: InternalCase): number {
@@ -598,11 +780,15 @@ export class GameEngine {
     return this.state.cases.filter((item) => !item.opened).map((item) => this.amountOf(item))
   }
 
+  private static clampAmount(value: number, lower: number, upper: number): number {
+    return Math.min(upper, Math.max(lower, Math.floor(value)))
+  }
+
   private static reject(error: EngineErrorEnum): EngineResult {
     return { ok: false, error }
   }
 
-  private static createIdleState(): InternalState {
+  private static createIdleState(strategy: PersonaStrategy): InternalState {
     return {
       phase: GamePhaseEnum.idle,
       k: 0,
@@ -620,14 +806,14 @@ export class GameEngine {
       logs: [],
       result: null,
       personaId: PlayerPersonaEnum.pragmatic,
+      personaState: strategy.createState(),
+      bankerState: createBankerRuntimeState(),
+      personaActionLabelKey: null,
       lastRejected: false,
       rejectStreak: 0,
-      pendingGreedPenalty: false,
-      greedPenaltiesUsed: 0,
       audienceDelta: 0,
       planHistory: [],
       passiveNotice: null,
-      restorerUsed: false,
       highestOffer: 0
     }
   }

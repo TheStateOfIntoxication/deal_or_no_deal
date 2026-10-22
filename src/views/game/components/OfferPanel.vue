@@ -1,10 +1,17 @@
 <script lang="ts" setup>
 import { computed } from 'vue'
+import type { MessageKey } from '@/language'
 import { formatMoney } from '@/utils/money'
 import { formatPercent, formatSignedPercent } from '@/utils/percent'
-import type { AmountGradeEnum } from '@/types/game'
+import type { AmountGradeEnum, PersonaActionEnum } from '@/types/game'
 import { BANKER_PLAN_LABEL_KEYS } from '../bankerLines'
-import type { BankerPlanState, OfferBreakdownState, RoundOpenedState } from '../types'
+import type {
+  BankerPlanState,
+  OfferBreakdownState,
+  PersonaActionState,
+  PersonaState,
+  RoundOpenedState
+} from '../types'
 
 const props = defineProps<{
   visible: boolean
@@ -14,10 +21,17 @@ const props = defineProps<{
   roundOpened: RoundOpenedState[]
   breakdown: OfferBreakdownState | null
   plan: BankerPlanState | null
+  quirkLabelKey: MessageKey | null
   canDeal: boolean
+  personaState: PersonaState
+  personaActions: PersonaActionState[]
 }>()
 
-const emit = defineEmits<{ (e: 'deal'): void; (e: 'noDeal'): void }>()
+const emit = defineEmits<{
+  (e: 'deal'): void
+  (e: 'noDeal'): void
+  (e: 'persona-action', action: PersonaActionEnum): void
+}>()
 
 /** 剩余金额区间，辅助决策（R-9.5） */
 const rangeText = computed(() => {
@@ -39,6 +53,8 @@ const ragePenaltyText = computed(() => formatPercent(ragePenalty.value))
 const planText = computed(() => formatSignedPercent(props.plan?.delta ?? 0))
 const personaText = computed(() => formatSignedPercent(props.breakdown?.persona ?? 0))
 const audienceText = computed(() => formatSignedPercent(props.breakdown?.audience ?? 0))
+const quirkText = computed(() => formatSignedPercent(props.breakdown?.quirk ?? 0))
+const actionText = computed(() => formatSignedPercent(props.breakdown?.action ?? 0))
 const raiseText = computed(() => formatPercent(props.breakdown?.raise ?? 0))
 const offerRatioText = computed(() => {
   if (props.remainingAmounts.length === 0) return '0.0%'
@@ -72,6 +88,20 @@ const offerRatioText = computed(() => {
         </el-button>
       </div>
     </div>
+    <div v-if="personaActions.length" class="offer-panel__persona">
+      <span class="offer-panel__persona-label">{{ $t('PersonaActionTitle') }}</span>
+      <el-button
+        v-for="action in personaActions"
+        :key="action.id"
+        plain
+        size="small"
+        :disabled="!action.enabled"
+        :title="$t(action.hintKey)"
+        @click="emit('persona-action', action.id)"
+      >
+        {{ $t(action.labelKey) }}
+      </el-button>
+    </div>
     <div class="offer-panel__meta">
       <span>{{ $t('OfferRemainingCount', { count: remainingAmounts.length }) }}</span>
       <span>{{ $t('OfferRemainingHint') }} {{ rangeText }}</span>
@@ -84,6 +114,18 @@ const offerRatioText = computed(() => {
       </span>
       <span v-if="plan && plan.delta !== 0" class="offer-panel__tag offer-panel__tag--plan">
         {{ $t(BANKER_PLAN_LABEL_KEYS[plan.id]) }} {{ planText }}
+      </span>
+      <span
+        v-if="quirkLabelKey && breakdown && breakdown.quirk !== 0"
+        class="offer-panel__tag offer-panel__tag--quirk"
+      >
+        {{ $t(quirkLabelKey) }} {{ quirkText }}
+      </span>
+      <span
+        v-if="personaState.actionLabelKey"
+        class="offer-panel__tag offer-panel__tag--action"
+      >
+        {{ $t(personaState.actionLabelKey) }} {{ actionText }}
       </span>
       <span
         v-if="breakdown && breakdown.persona !== 0"
@@ -183,6 +225,18 @@ const offerRatioText = computed(() => {
     }
   }
 
+  &__persona {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+  }
+
+  &__persona-label {
+    font-size: 11px;
+    color: var(--dond-text-dim);
+  }
+
   &__meta {
     display: flex;
     flex-wrap: wrap;
@@ -221,6 +275,18 @@ const offerRatioText = computed(() => {
     }
 
     &--persona {
+      color: #d8c9ff;
+      background: #b79cff26;
+      box-shadow: inset 0 0 0 1px #b79cff66;
+    }
+
+    &--quirk {
+      color: #ffd9a8;
+      background: #e08b3a26;
+      box-shadow: inset 0 0 0 1px #e08b3a66;
+    }
+
+    &--action {
       color: #d8c9ff;
       background: #b79cff26;
       box-shadow: inset 0 0 0 1px #b79cff66;

@@ -62,6 +62,8 @@ const {
   handleCaseHover,
   handleDeal,
   handleNoDeal,
+  handlePersonaAction,
+  handleSideBet,
   handleSwap,
   dismissResult
 } = useGameSession()
@@ -106,7 +108,6 @@ const dialogState = computed(() => ({
       @pick="handlePick"
       @start="beginGame"
     />
-
     <template v-else>
       <GameStatusBar
         :round="snapshot.round"
@@ -148,6 +149,7 @@ const dialogState = computed(() => ({
           @hover="handleCaseHover"
           @deal="handleDeal"
           @no-deal="handleNoDeal"
+          @persona-action="handlePersonaAction" @side-bet="handleSideBet"
         />
       </main>
       <RoundHistory :logs="snapshot.logs" />

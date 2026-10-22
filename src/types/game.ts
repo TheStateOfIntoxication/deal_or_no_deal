@@ -14,7 +14,15 @@ export enum PlayerPersonaEnum {
   conformist = 'conformist',
   restorer = 'restorer',
   raiser = 'raiser',
-  closer = 'closer'
+  closer = 'closer',
+  host = 'host',
+  holdout = 'holdout'
+}
+
+/** One-off active ability shown during an offer */
+export enum PersonaActionEnum {
+  hostHype = 'hostHype',
+  hostCalm = 'hostCalm'
 }
 
 /** Banker's per-round plan */

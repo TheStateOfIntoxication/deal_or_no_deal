@@ -5,6 +5,7 @@ import {
   AudienceTraitEnum,
   BankerPlanEnum,
   GameModeEnum,
+  PersonaActionEnum,
   PlayerPersonaEnum
 } from '@/types/game'
 import type { AmountGradeEnum, DecidedByType, PayoutGradeEnum } from '@/types/game'
@@ -38,6 +39,7 @@ export enum EngineErrorEnum {
   playerCaseForbidden = 'playerCaseForbidden',
   openQuotaReached = 'openQuotaReached',
   personaLocked = 'personaLocked',
+  actionUnavailable = 'actionUnavailable',
   gameOver = 'gameOver'
 }
 
@@ -133,6 +135,10 @@ export interface OfferBreakdownState {
   persona: number
   /** 观众增量（可正可负） */
   audience: number
+  /** 银行家特性带来的最终报价比例，0 表示未触发 */
+  quirk: number
+  /** 玩家主动能力带来的最终报价比例，0 表示未使用 */
+  action: number
   /** 最终报价金额加成（关系户） */
   raise: number
   /** 最终生效乘数 */
@@ -159,6 +165,8 @@ export interface BankerOfferMetaState {
   breakdown: OfferBreakdownState
   /** 本轮计划，无计划时为 null */
   plan: BankerPlanState | null
+  /** 银行家特性标签，未触发时为 null */
+  quirkLabelKey: MessageKey | null
 }
 
 /** 观众成员 */
@@ -192,6 +200,51 @@ export interface PassiveNoticeState {
   amount: number
 }
 
+/** 玩家角色本局的可见状态 */
+export interface PersonaState {
+  /** 主动能力当前是否可点 */
+  actionAvailable: boolean
+  /** 主动能力是否已经用掉 */
+  actionUsed: boolean
+  /** 已使用能力的文案标签 */
+  actionLabelKey: MessageKey | null
+  /** 钉子户骨气层数 */
+  stacks: number
+  /** 钉子户每层带来的报价乘数增量 */
+  stackBonus: number
+}
+
+/** 玩家主动能力的展示项 */
+export interface PersonaActionState {
+  id: PersonaActionEnum
+  labelKey: MessageKey
+  hintKey: MessageKey
+  enabled: boolean
+}
+
+/** 赌场老板边注结果 */
+export type SideBetOutcome = 'win' | 'lose'
+
+/** 赌场老板边注的界面状态 */
+export interface BankerSideBetState {
+  available: boolean
+  used: number
+  maxUses: number
+  pending: boolean
+  outcome: SideBetOutcome | null
+  winFactor: number
+  lossFactor: number
+  labelKey: MessageKey
+  winLabelKey: MessageKey
+  lossLabelKey: MessageKey
+}
+
+/** 银行家本局的可见状态 */
+export interface BankerState {
+  quirkLabelKey: MessageKey | null
+  sideBet: BankerSideBetState | null
+}
+
 /** 供界面渲染的只读快照 */
 export interface GameSnapshot {
   phase: GamePhaseEnum
@@ -216,6 +269,12 @@ export interface GameSnapshot {
   canDeal: boolean
   /** 角色被动触发提示；无则为 null */
   passiveNotice: PassiveNoticeState | null
+  /** 本局角色可见状态 */
+  personaState: PersonaState
+  /** 当前可用的角色主动能力 */
+  personaActions: PersonaActionState[]
+  /** 本局银行家可见状态 */
+  bankerState: BankerState
   /** 本局银行家最高报价（用于结算复盘） */
   highestOffer: number
   /** 未打开箱子对应的金额多重集，含玩家箱（R-6.1.1、R-9.5） */
@@ -244,3 +303,8 @@ export interface GameSnapshot {
 
 /** 引擎操作的统一返回：失败时不改变状态 */
 export type EngineResult = { ok: true } | { ok: false; error: EngineErrorEnum }
+
+/** 主动能力的结果；观众情绪由会话层落到 AudienceDirector */
+export type EngineActionResult =
+  | { ok: true; audienceMoodDelta: number }
+  | { ok: false; error: EngineErrorEnum }
