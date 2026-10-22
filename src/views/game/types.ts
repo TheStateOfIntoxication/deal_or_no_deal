@@ -1,0 +1,141 @@
+import type { AmountGradeEnum, DecidedByType, PayoutGradeEnum } from '@/types/game'
+
+/** 游戏阶段（R-5、R-7） */
+export enum GamePhaseEnum {
+  idle = 'idle', // 未开局
+  waitingPlayerCase = 'waitingPlayerCase', // 等待玩家选箱
+  opening = 'opening', // 本轮开箱中
+  offerPending = 'offerPending', // 已报价，待 Deal / No Deal
+  swapPending = 'swapPending', // 终局，待决定是否交换
+  settled = 'settled' // 已结算
+}
+
+/** 操作被拒绝的原因（R-11.3、R-11.5、R-11.6） */
+export enum EngineErrorEnum {
+  configInvalid = 'configInvalid',
+  invalidDraw = 'invalidDraw',
+  wrongPhase = 'wrongPhase',
+  unknownCase = 'unknownCase',
+  caseAlreadyOpened = 'caseAlreadyOpened',
+  playerCaseForbidden = 'playerCaseForbidden',
+  openQuotaReached = 'openQuotaReached',
+  gameOver = 'gameOver'
+}
+
+/** 界面可见的单个箱子状态 */
+export interface CaseState {
+  no: number
+  isPlayerCase: boolean
+  opened: boolean
+  /** 未揭示时为 null（R-9.1、R-9.4） */
+  revealedAmount: number | null
+  /** 金额对玩家好坏的展示分级；未揭示时为 null */
+  grade: AmountGradeEnum | null
+}
+
+/** 一次开箱的展示数据 */
+export interface RoundOpenedState {
+  caseNo: number
+  amount: number
+  grade: AmountGradeEnum
+}
+
+/** 金额板的一行：多重集中的一项（R-9.5、R-9.6） */
+export interface AmountRowState {
+  id: number
+  amount: number
+  eliminated: boolean
+}
+
+/** 单轮开箱与报价记录 */
+export interface RoundLogState {
+  round: number
+  openedAmounts: number[]
+  offer: number
+}
+
+/** 结算结果 */
+export interface GameResultState {
+  /** 到手奖金：Deal 为报价金额，终局为持有箱金额 */
+  prize: number
+  /** 到手奖金的展示档位 */
+  payoutGrade: PayoutGradeEnum
+  decidedBy: DecidedByType
+  swapped: boolean
+  /** 最终持有的箱号（交换后为原非玩家箱） */
+  heldCaseNo: number
+  /** 最终持有箱的金额 */
+  heldCaseAmount: number
+  playerCaseAmount: number
+  otherCaseAmount: number | null
+}
+
+/** 玩家箱舞台卡的数据（顶奖概率 HUD） */
+export interface PlayerCaseStats {
+  caseNo: number | null
+  revealedAmount: number | null
+  revealedGrade: PayoutGradeEnum | null
+  /** 结算揭晓中（标记未翻牌），用于显示“正在打开”状态 */
+  revealing: boolean
+  /** 本局顶奖金额（分） */
+  topPrize: number
+  /** 玩家箱为顶奖的概率，0–1 */
+  probability: number
+  topPrizeRemaining: number
+  remainingCaseCount: number
+  /** 剩余金额区间，如 "$1.00 – $1,000,000.00" */
+  rangeText: string
+  /** 概率里程碑文案，空串表示未达任一档 */
+  milestoneText: string
+}
+
+/** 银行家表情档位 */
+export type BankerExpression = 'smug' | 'annoyed' | 'angry' | 'furious'
+
+/** 报价时的银行家修正（均以乘数增量表示，可正可负） */
+export interface BankerOfferMetaState {
+  /** 因顶奖概率高而加价（正数） */
+  fear: number
+  /** 因怒气而压价（负数或 0，此处存正数幅度） */
+  ragePenalty: number
+  /** 报价时的银行家信心 = 1 − p */
+  confidence: number
+}
+
+/** 供界面渲染的只读快照 */
+export interface GameSnapshot {
+  phase: GamePhaseEnum
+  k: number
+  round: number
+  totalRounds: number
+  remainingToOpen: number
+  playerCaseNo: number | null
+  cases: CaseState[]
+  amountRows: AmountRowState[]
+  currentOffer: number | null
+  /** 未打开箱子对应的金额多重集，含玩家箱（R-6.1.1、R-9.5） */
+  remainingAmounts: number[]
+  /** 未打开的箱子数（含玩家箱） */
+  remainingCaseCount: number
+  /** 顶奖金额（分） */
+  topPrize: number
+  /** 仍在场的顶奖金额项数 */
+  topPrizeRemaining: number
+  /** 银行家怒气 0–100 */
+  rage: number
+  /** 本局玩家拒绝报价的次数 */
+  noDealCount: number
+  /** 银行家信心 = 1 − P(玩家箱是顶奖) */
+  bankerConfidence: number
+  /** 当前报价的银行家修正，无报价时为 null */
+  offerMeta: BankerOfferMetaState | null
+  /** 本轮已开箱记录 */
+  roundOpened: RoundOpenedState[]
+  /** 最近一次开箱，用于"刚刚开出"提示 */
+  lastOpened: RoundOpenedState | null
+  logs: RoundLogState[]
+  result: GameResultState | null
+}
+
+/** 引擎操作的统一返回：失败时不改变状态 */
+export type EngineResult = { ok: true } | { ok: false; error: EngineErrorEnum }

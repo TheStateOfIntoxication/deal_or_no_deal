@@ -1,0 +1,79 @@
+// 全局唯一覆盖点：变量、reset、Element Plus 全局定制
+// 说明：Element Plus 的按需样式在路由 chunk 中晚于本文件加载，
+// 因此变量与组件覆盖统一提升到 html 前缀，靠特异性而非加载顺序取胜。
+html:root {
+  --dond-bg: #0b1a2b;
+  --dond-bg-deep: #061220;
+  --dond-panel: #10263c;
+  --dond-gold: #f2c14e;
+  --dond-gold-soft: #f2c14e33;
+  --dond-text: #e8eef6;
+  --dond-text-dim: #8fa6bd;
+  --dond-danger: #e35d6a;
+  --dond-success: #35c48c;
+  --dond-radius: 10px;
+
+  --el-color-primary: #2b74b8;
+  --el-color-warning: #f2c14e;
+  --el-color-danger: #e35d6a;
+  --el-text-color-primary: #e8eef6;
+  --el-text-color-regular: #cfdbe8;
+  --el-bg-color: #10263c;
+  --el-fill-color-blank: #10263c;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  color: var(--dond-text);
+  font-family: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
+  background:
+    radial-gradient(circle at 20% 0%, #1b3f60 0%, transparent 55%),
+    radial-gradient(circle at 85% 100%, #12354f 0%, transparent 50%),
+    var(--dond-bg-deep);
+}
+
+h1,
+h2,
+h3,
+p,
+dl,
+dd,
+dt,
+ul {
+  margin: 0;
+  padding: 0;
+}
+
+ul {
+  list-style: none;
+}
+
+button {
+  font-family: inherit;
+  color: inherit;
+}
+
+html .el-dialog {
+  --el-dialog-bg-color: var(--dond-panel);
+  border: 1px solid var(--dond-gold);
+  border-radius: 12px;
+  box-shadow: 0 24px 60px #00000066;
+}
+
+html .el-dialog__header {
+  margin-right: 0;
+}
+
+html .el-overlay {
+  backdrop-filter: blur(3px);
+}
