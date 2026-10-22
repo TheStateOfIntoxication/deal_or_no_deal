@@ -17,7 +17,7 @@ export const DEFAULT_BANKER_PROFILE: BankerProfile = {
   lineTone: 'sharp'
 }
 
-/** Placeholder for the future charity banker; not selectable yet */
+/** Charity banker: generous base multiplier and gentle lines */
 export const CHARITY_BANKER_PROFILE: BankerProfile = {
   id: BankerProfileEnum.charity,
   nameKey: 'BankerCharityName',
@@ -35,13 +35,25 @@ export const CHARITY_BANKER_PROFILE: BankerProfile = {
   lineTone: 'gentle'
 }
 
-export const BANKER_PROFILES = [DEFAULT_BANKER_PROFILE, CHARITY_BANKER_PROFILE]
+export const CONSPIRATOR_BANKER_PROFILE: BankerProfile = {
+  id: BankerProfileEnum.conspirator,
+  nameKey: 'BankerConspiratorName',
+  traitKey: 'BankerConspiratorTrait',
+  emoji: '🕵️',
+  tone: 'violet',
+  planWeights: {},
+  offerMode: 'curve',
+  lineTone: 'sharp'
+}
+
+export const BANKER_PROFILES = [DEFAULT_BANKER_PROFILE, CHARITY_BANKER_PROFILE, CONSPIRATOR_BANKER_PROFILE]
 export const GAME_BANKER_IDS: BankerProfileEnum[] = BANKER_PROFILES.map((profile) => profile.id)
 
 /** Rotation weights: charity is rarer than the default banker */
 export const BANKER_ROTATION_WEIGHTS: Record<BankerProfileEnum, number> = {
   [BankerProfileEnum.default]: 4,
-  [BankerProfileEnum.charity]: 1
+  [BankerProfileEnum.charity]: 1,
+  [BankerProfileEnum.conspirator]: 1
 }
 const BANKER_PROFILE_MAP = new Map(BANKER_PROFILES.map((profile) => [profile.id, profile]))
 

@@ -2,7 +2,7 @@
  * Balance simulation (dev-only, not shipped).
  * Usage: npx vite-node scripts/simulate.ts [gamesPerCombo]
  */
-import { BankerProfileEnum } from '@/config/bankers'
+import { BANKER_PROFILES, BankerProfileEnum } from '@/config/bankers'
 import { createModeGameConfig } from '@/config/modes'
 import { GameModeEnum, PlayerPersonaEnum } from '@/types/game'
 import { createRandom } from '@/utils/random'
@@ -13,7 +13,7 @@ type Strategy = 'first' | 'ratio-60' | 'ratio-80' | 'never'
 const STRATEGIES: Strategy[] = ['first', 'ratio-60', 'ratio-80', 'never']
 const PERSONAS = Object.values(PlayerPersonaEnum)
 const MODES = [GameModeEnum.classic, GameModeEnum.jackpot]
-const BANKERS = [BankerProfileEnum.default, BankerProfileEnum.charity]
+const BANKERS = BANKER_PROFILES.map((profile) => profile.id)
 const GAMES_PER_COMBO = Math.max(20, Number(process.argv[2] ?? 200))
 
 interface Stat {

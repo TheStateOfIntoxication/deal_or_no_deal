@@ -28,6 +28,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'select', caseNo: number): void
+  (e: 'hover', caseNo: number): void
   (e: 'deal'): void
   (e: 'no-deal'): void
 }>()
@@ -74,6 +75,7 @@ const emit = defineEmits<{
       :remaining-to-open="props.snapshot.remainingToOpen"
       :recommended-case-nos="props.recommendedCaseNos"
       @select="emit('select', $event)"
+      @hover="emit('hover', $event)"
     />
     <AudienceRow
       :members="props.audienceMembers"

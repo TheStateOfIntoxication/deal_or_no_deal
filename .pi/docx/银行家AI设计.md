@@ -378,7 +378,7 @@ export const BANKER_PLAN_RULES = {
 
 ---
 
-## 14. 银行家档案与赌徒局的存在感（v1.2）
+## 14. 银行家档案与赌徒局的存在感（v1.3）
 
 ### 14.1 档案注册表
 
@@ -386,7 +386,9 @@ export const BANKER_PLAN_RULES = {
   - `BankerProfile`：`id`、名称/特质 key、`planWeights`、`offerMode`（curve / highest）、`lineTone`（sharp / gentle）。
   - `default`：当前尖酸压价型，计划权重为基线。
   - `charity`：已启用轮换；高慷慨/拒绝补偿权重、温和台词、最高曲线档报价。
+  - `conspirator`：悬停未开箱时低语金额档位，35% 触发、60% 真 / 40% 假；每轮/每箱最多 1 次。
 - `BankerBrain.chooseBankerPlan(ctx, random, profile)` 按档案覆盖计划权重；报价管线与计划上限不变。后续新增银行家只加档案，不改引擎。
+- 阴谋家：每轮首次悬停未开非玩家箱，35% 概率低语档位；60% 真 / 40% 假；每轮/每箱最多 1 次。
 - 新局从打乱后的银行家队列取下一个；队列耗尽重洗，避免跨边界连续重复（`BankerRotation`）。
 - 未来接入选择 UI 时，建议“抽银行家卡”与“抽玩法卡”并列；`charity` 的 `offerMode: 'highest'` 走单独校准，不直接改默认曲线。
 

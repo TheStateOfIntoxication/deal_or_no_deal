@@ -377,6 +377,12 @@ export class GameEngine {
     return this.random.seed
   }
 
+  /** 仅阴谋家悬停提示使用：读取指定箱的真实金额，不进入快照/UI */
+  getCaseAmountForHint(caseNo: number): number | null {
+    const target = this.state.cases.find((item) => item.no === caseNo)
+    return target ? this.amountOf(target) : null
+  }
+
   /** 捡漏王：最高奖全部离场且仍有至少 5 箱时，把一个非玩家剩余最大金额补成新顶奖（每局一次） */
   private maybeRestoreTopPrize(): void {
     const state = this.state

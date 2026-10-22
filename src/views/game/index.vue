@@ -59,6 +59,7 @@ const {
   beginGame,
   resetDraw,
   handleSelect,
+  handleCaseHover,
   handleDeal,
   handleNoDeal,
   handleSwap,
@@ -144,6 +145,7 @@ const dialogState = computed(() => ({
           :audience-reactions="audienceReactions"
           :table-shaking="tableShaking"
           @select="handleSelect"
+          @hover="handleCaseHover"
           @deal="handleDeal"
           @no-deal="handleNoDeal"
         />
@@ -156,7 +158,6 @@ const dialogState = computed(() => ({
         @dismiss="dismissResult"
       />
     </template>
-
     <div
       v-if="flashGrade"
       class="game-page__flash"

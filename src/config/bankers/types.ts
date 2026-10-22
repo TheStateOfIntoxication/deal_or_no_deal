@@ -4,7 +4,8 @@ import type { BankerPlanEnum } from '@/types/game'
 /** Banker character identities; only default is selectable in v1.5 */
 export enum BankerProfileEnum {
   default = 'default',
-  charity = 'charity'
+  charity = 'charity',
+  conspirator = 'conspirator'
 }
 
 /** One banker personality: plan bias, line tone, and future offer mode */

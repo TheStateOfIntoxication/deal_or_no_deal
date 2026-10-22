@@ -11,7 +11,10 @@ const props = defineProps<{
   recommendedCaseNos?: number[]
 }>()
 
-const emit = defineEmits<{ (e: 'select', caseNo: number): void }>()
+const emit = defineEmits<{
+  (e: 'select', caseNo: number): void
+  (e: 'hover', caseNo: number): void
+}>()
 
 /** 当前阶段该箱子是否不可点击（R-5.2.1–R-5.2.3、R-11.3） */
 const isDisabled = (item: CaseState): boolean => {
@@ -39,6 +42,8 @@ const caseClass = (item: CaseState): Record<string, boolean> => {
         class="case-grid__case"
         :class="caseClass(item)"
         :disabled="isDisabled(item)"
+        @mouseenter="emit('hover', item.no)"
+        @focus="emit('hover', item.no)"
         @click="emit('select', item.no)"
       >
         <span class="case-grid__no">{{ item.no }}</span>

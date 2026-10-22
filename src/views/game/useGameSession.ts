@@ -34,6 +34,7 @@ import { PoolBuilder } from './services/PoolBuilder'
 import { GameEngine } from './services/GameEngine'
 import { AudienceDirector } from './services/AudienceDirector'
 import { BankerRotation } from './services/BankerRotation'
+import { CaseTierEnum, createConspiratorHint } from './services/ConspiratorHint'
 import { buildModeDeck } from './services/ModeDeckBuilder'
 import type { ModeCardState } from './services/ModeDeckBuilder'
 import { useAudio } from './useAudio'
@@ -115,6 +116,7 @@ export interface GameSessionApi {
   beginGame: () => void
   resetDraw: () => void
   handleSelect: (caseNo: number) => void
+  handleCaseHover: (caseNo: number) => void
   handleDeal: () => void
   handleNoDeal: () => void
   handleSwap: (shouldSwap: boolean) => void
@@ -159,6 +161,9 @@ export function useGameSession(): GameSessionApi {
   const resultDismissed = ref<boolean>(false)
   const flashGrade = ref<AmountGradeEnum | PayoutGradeEnum | null>(null)
   const bankerRotation = new BankerRotation(createSeed())
+  let conspiratorRandom = createRandom(deriveSeed(sessionSeed.value, 'conspirator'))
+  const conspiratorTriedRounds = new Set<number>()
+  const conspiratorHintedCases = new Set<number>()
   const bankerProfileId = ref<BankerProfileEnum>(BankerProfileEnum.default)
   const bankerProfile = computed(() => getBankerProfile(bankerProfileId.value))
   let nextBankerLine = createBankerLinePicker()
@@ -399,6 +404,9 @@ export function useGameSession(): GameSessionApi {
     bankerLineKey.value = 'BankerLineGreeting1'
     bankerProfileId.value = bankerRotation.next()
     nextBankerLine = createBankerLinePicker(bankerProfile.value.lineTone)
+    conspiratorRandom = createRandom(deriveSeed(sessionSeed.value, 'conspirator'))
+    conspiratorTriedRounds.clear()
+    conspiratorHintedCases.clear()
     engine = new GameEngine(
       createModeGameConfig(GameModeEnum.classic, sessionSeed.value),
       GameModeEnum.classic,
@@ -537,6 +545,35 @@ export function useGameSession(): GameSessionApi {
       personaId: snapshot.value.personaId,
       sessionSeed: sessionSeed.value
     })
+  }
+
+  const CONSPIRATOR_CLAIM_KEYS: Record<CaseTierEnum, MessageKey> = {
+    [CaseTierEnum.top]: 'BankerLineConspiratorClaimTop',
+    [CaseTierEnum.high]: 'BankerLineConspiratorClaimHigh',
+    [CaseTierEnum.mid]: 'BankerLineConspiratorClaimMid',
+    [CaseTierEnum.low]: 'BankerLineConspiratorClaimLow'
+  }
+
+  /** 阴谋家：每轮第一次悬停未开箱时，有机会低语一个金额档位（可能说谎） */
+  const handleCaseHover = (caseNo: number): void => {
+    if (bankerProfile.value.id !== BankerProfileEnum.conspirator) return
+    if (phase.value !== GamePhaseEnum.waitingPlayerCase && phase.value !== GamePhaseEnum.opening) return
+    const target = snapshot.value.cases.find((item) => item.no === caseNo)
+    if (!target || target.opened || target.isPlayerCase) return
+    if (conspiratorHintedCases.has(caseNo) || conspiratorTriedRounds.has(snapshot.value.round)) return
+
+    conspiratorTriedRounds.add(snapshot.value.round)
+    const amount = engine.getCaseAmountForHint(caseNo)
+    if (amount === null) return
+    const hint = createConspiratorHint(
+      amount,
+      snapshot.value.amountRows.map((row) => row.amount),
+      snapshot.value.topPrize,
+      conspiratorRandom
+    )
+    if (!hint) return
+    conspiratorHintedCases.add(caseNo)
+    bankerLineKey.value = CONSPIRATOR_CLAIM_KEYS[hint.claimTier]
   }
 
   const handleDeal = (): void => {
@@ -698,6 +735,7 @@ export function useGameSession(): GameSessionApi {
     beginGame,
     resetDraw,
     handleSelect,
+    handleCaseHover,
     handleDeal,
     handleNoDeal,
     handleSwap,
