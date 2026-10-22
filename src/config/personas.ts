@@ -50,6 +50,8 @@ export const HOLDOUT_OFFER_THRESHOLD = 0.55
 export const HOLDOUT_STACK_BONUS = 0.03
 /** Holdout: maximum resolve stacks per game */
 export const HOLDOUT_MAX_STACKS = 3
+/** Lucky: classic mode skips the k draw and starts with this many $1M cases */
+export const LUCKY_TOP_PRIZE_COUNT = 13
 
 export const PLAYER_PERSONAS: PlayerPersonaDefinition[] = [
   {
@@ -130,6 +132,16 @@ export const PLAYER_PERSONAS: PlayerPersonaDefinition[] = [
     adviceHoldKey: 'PersonaHoldoutAdvice',
     emoji: '🧱',
     tone: 'red',
+    difficulty: 1
+  },
+  {
+    id: PlayerPersonaEnum.lucky,
+    nameKey: 'PersonaLuckyName',
+    traitKey: 'PersonaLuckyTrait',
+    adviceDealKey: 'PersonaLuckyAdvice',
+    adviceHoldKey: 'PersonaLuckyAdvice',
+    emoji: '🍀',
+    tone: 'green',
     difficulty: 1
   }
 ]

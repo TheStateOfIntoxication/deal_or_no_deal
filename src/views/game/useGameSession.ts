@@ -30,6 +30,8 @@ import {
 } from '@/types/game'
 import { formatMoney } from '@/utils/money'
 import { createRandom, createSeed, deriveSeed } from '@/utils/random'
+import { AmountGrader } from './services/AmountGrader'
+import type { AmountTone } from './services/AmountGrader'
 import { OfferCalculator } from './services/OfferCalculator'
 import { PoolBuilder } from './services/PoolBuilder'
 import { GameEngine } from './services/GameEngine'
@@ -98,6 +100,7 @@ export interface GameSessionApi {
   tableShaking: ComputedRef<boolean>
   bestPrize: ComputedRef<number>
   flashGrade: Ref<AmountGradeEnum | PayoutGradeEnum | null>
+  flashTone: Ref<AmountTone | null>
   bankerLine: ComputedRef<string>
   bankerName: ComputedRef<string>
   bankerTrait: ComputedRef<string>
@@ -116,7 +119,7 @@ export interface GameSessionApi {
   handlePersonaPick: (id: PlayerPersonaEnum) => void
   handlePersonaConfirm: () => void
   handlePick: (index: number) => void
-  beginGame: () => void
+  beginGame: (forcedK?: number) => void
   resetDraw: () => void
   handleSelect: (caseNo: number) => void
   handleCaseHover: (caseNo: number) => void
@@ -165,6 +168,7 @@ export function useGameSession(): GameSessionApi {
   const resultReady = ref<boolean>(false)
   const resultDismissed = ref<boolean>(false)
   const flashGrade = ref<AmountGradeEnum | PayoutGradeEnum | null>(null)
+  const flashTone = ref<AmountTone | null>(null)
   const bankerRotation = new BankerRotation(createSeed())
   let conspiratorRandom = createRandom(deriveSeed(sessionSeed.value, 'conspirator'))
   const conspiratorTriedRounds = new Set<number>()
@@ -338,11 +342,13 @@ export function useGameSession(): GameSessionApi {
     bankerLineKey.value = nextBankerLine(event)
   }
 
-  const flash = (grade: AmountGradeEnum | PayoutGradeEnum): void => {
+  const flash = (grade: AmountGradeEnum | PayoutGradeEnum, tone: AmountTone): void => {
     flashGrade.value = grade
+    flashTone.value = tone
     window.clearTimeout(flashTimer)
     flashTimer = window.setTimeout(() => {
       flashGrade.value = null
+      flashTone.value = null
     }, FLASH_MS)
   }
 
@@ -399,6 +405,7 @@ export function useGameSession(): GameSessionApi {
     resultReady.value = false
     resultDismissed.value = false
     flashGrade.value = null
+    flashTone.value = null
     meltdownActive.value = false
     bankerLineKey.value = 'BankerLineGreeting1'
     bankerProfileId.value = bankerRotation.next()
@@ -458,6 +465,13 @@ export function useGameSession(): GameSessionApi {
 
   const handlePersonaConfirm = (): void => {
     if (!personaId.value || setupPhase.value !== SetupPhaseEnum.personaPick) return
+    const forcedK = mode.value
+      ? (getPersonaStrategy(personaId.value).getForcedStartK?.(mode.value.id) ?? null)
+      : null
+    if (forcedK !== null) {
+      beginGame(forcedK)
+      return
+    }
     setupPhase.value = SetupPhaseEnum.modeSetup
     if (mode.value?.setup === 'k-draw') {
       drawCandidates.value = engine.createKDraw()
@@ -471,11 +485,11 @@ export function useGameSession(): GameSessionApi {
     playDraw()
   }
 
-  /** 用玩家抽到的 k（经典）或固定 1 个顶奖（巨奖）开局 */
-  const beginGame = (): void => {
+  /** 用玩家抽到的 k（经典）、角色强制 k，或固定 1 个顶奖（巨奖）开局 */
+  const beginGame = (forcedK?: number): void => {
     if (!selectedMode.value || !personaId.value) return
     const isClassic = mode.value?.setup === 'k-draw'
-    const k = isClassic ? pickedK.value : undefined
+    const k = forcedK ?? (isClassic ? pickedK.value : undefined)
     if (isClassic && k === null) return
 
     const result = engine.start(k ?? undefined, personaId.value)
@@ -517,7 +531,11 @@ export function useGameSession(): GameSessionApi {
     const opened = snapshot.value.lastOpened
     if (opened) {
       playGrade(opened.grade)
-      flash(opened.grade)
+      const tone = AmountGrader.toneOf(
+        opened.amount,
+        snapshot.value.amountRows.map((row) => row.amount)
+      )
+      flash(opened.grade, tone)
       if (audienceDirector) {
         const reactions = audienceDirector.react(opened, snapshot.value.amountRows.map((row) => row.amount))
         if (reactions.length > 0) {
@@ -662,6 +680,7 @@ export function useGameSession(): GameSessionApi {
     finalRevealed.value = false
     resultReady.value = false
     resultDismissed.value = false
+    flashTone.value = null
 
     if (value === GamePhaseEnum.offerPending) {
       holdTimer = window.setTimeout(() => {
@@ -696,8 +715,13 @@ export function useGameSession(): GameSessionApi {
 
         const grade = snapshot.value.result?.payoutGrade
         if (!grade) return
+        const prize = snapshot.value.result?.prize ?? 0
+        const tone = AmountGrader.toneOf(
+          prize,
+          snapshot.value.amountRows.map((row) => row.amount)
+        )
         playPayout(grade)
-        flash(grade)
+        flash(grade, tone)
       }, FINAL_REVEAL_MS)
       resultTimer = window.setTimeout(() => {
         resultReady.value = true
@@ -741,6 +765,7 @@ export function useGameSession(): GameSessionApi {
     tableShaking,
     bestPrize,
     flashGrade,
+    flashTone,
     bankerLine,
     bankerName,
     bankerTrait,

@@ -15,6 +15,7 @@ import {
   HOST_HYPE_AUDIENCE,
   HOST_HYPE_OFFER,
   HOST_HYPE_RAGE,
+  LUCKY_TOP_PRIZE_COUNT,
   PRAGMATIC_ADVICE_THRESHOLD,
   PRAGMATIC_GREED_THRESHOLD,
   PRAGMATIC_MAX_PENALTIES,
@@ -22,7 +23,7 @@ import {
   RAISER_OFFER_BOOST,
   RESTORER_MIN_REMAINING
 } from '@/config/personas'
-import { PersonaActionEnum, PlayerPersonaEnum } from '@/types/game'
+import { GameModeEnum, PersonaActionEnum, PlayerPersonaEnum } from '@/types/game'
 import type {
   PersonaActionContext,
   PersonaActionView,
@@ -214,6 +215,16 @@ const HOLDOUT: PersonaStrategy = {
   }
 }
 
+const LUCKY: PersonaStrategy = {
+  id: PlayerPersonaEnum.lucky,
+  canDeal: true,
+  audienceExtraMembers: 0,
+  createState: createRuntimeState,
+  getForcedStartK(modeId) {
+    return modeId === GameModeEnum.classic ? LUCKY_TOP_PRIZE_COUNT : null
+  }
+}
+
 const PERSONA_STRATEGIES: Record<PlayerPersonaEnum, PersonaStrategy> = {
   [PlayerPersonaEnum.pragmatic]: PRAGMATIC,
   [PlayerPersonaEnum.gambler]: GAMBLER,
@@ -222,7 +233,8 @@ const PERSONA_STRATEGIES: Record<PlayerPersonaEnum, PersonaStrategy> = {
   [PlayerPersonaEnum.raiser]: RAISER,
   [PlayerPersonaEnum.closer]: CLOSER,
   [PlayerPersonaEnum.host]: HOST,
-  [PlayerPersonaEnum.holdout]: HOLDOUT
+  [PlayerPersonaEnum.holdout]: HOLDOUT,
+  [PlayerPersonaEnum.lucky]: LUCKY
 }
 
 export function getPersonaStrategy(id: PlayerPersonaEnum): PersonaStrategy {

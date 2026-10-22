@@ -1,5 +1,5 @@
 import type { MessageKey } from '@/language'
-import type { DecidedByType, PersonaActionEnum, PlayerPersonaEnum } from '@/types/game'
+import type { DecidedByType, GameModeEnum, PersonaActionEnum, PlayerPersonaEnum } from '@/types/game'
 
 /** Mutable state owned by one persona for the current game */
 export interface PersonaRuntimeState {
@@ -82,6 +82,8 @@ export interface PersonaStrategy {
   audienceExtraMembers: number
   audienceRecommendationCount?: number
   createState: () => PersonaRuntimeState
+  /** Forces a start count and skips the mode's normal setup when non-null */
+  getForcedStartK?: (modeId: GameModeEnum) => number | null
   getAudienceDelta?: (mood: number) => number
   onNoDeal?: (ctx: PersonaNoDealContext, state: PersonaRuntimeState) => void
   getOfferDelta?: (ctx: PersonaOfferContext, state: PersonaRuntimeState) => number

@@ -1,11 +1,14 @@
-import { BASE_AMOUNTS_CENTS } from '@/config/game'
+import { BASE_AMOUNTS_CENTS, TOP_PRIZE_CENTS } from '@/config/game'
 import { GameModeEnum } from '@/types/game'
 import type { GameModeDefinition } from './types'
 
-/** $5,000,000 in cents; exactly one copy, no $1,000,000 in this mode */
+/** $5,000,000 in cents; exactly one copy */
 export const JACKPOT_TOP_PRIZE_CENTS = 500_000_000
 
-/** Jackpot: one unique $5M, no k draw, 25 base amounts + 1 top prize = 26 cases */
+/** Replace the $0.01 base amount with the universal guaranteed $1M */
+export const JACKPOT_BASE_AMOUNTS_CENTS = [...BASE_AMOUNTS_CENTS.slice(1), TOP_PRIZE_CENTS]
+
+/** Jackpot: one unique $5M, at least one $1M, no k draw, 25 base + 1 top = 26 */
 export const JACKPOT_MODE: GameModeDefinition = {
   id: GameModeEnum.jackpot,
   nameKey: 'ModeJackpotName',
@@ -17,7 +20,7 @@ export const JACKPOT_MODE: GameModeDefinition = {
   tone: 'violet',
   setup: 'fixed',
   overrides: {
-    baseAmounts: [...BASE_AMOUNTS_CENTS],
+    baseAmounts: [...JACKPOT_BASE_AMOUNTS_CENTS],
     topPrize: JACKPOT_TOP_PRIZE_CENTS,
     randomKEnabled: false,
     fixedK: 1,

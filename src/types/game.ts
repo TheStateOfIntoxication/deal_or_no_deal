@@ -16,7 +16,8 @@ export enum PlayerPersonaEnum {
   raiser = 'raiser',
   closer = 'closer',
   host = 'host',
-  holdout = 'holdout'
+  holdout = 'holdout',
+  lucky = 'lucky'
 }
 
 /** One-off active ability shown during an offer */

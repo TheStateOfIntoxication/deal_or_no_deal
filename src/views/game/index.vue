@@ -38,6 +38,7 @@ const {
   tableShaking,
   bestPrize,
   flashGrade,
+  flashTone,
   bankerLine,
   bankerName,
   bankerTrait,
@@ -69,6 +70,14 @@ const {
 } = useGameSession()
 
 const playing = computed(() => setupPhase.value === SetupPhaseEnum.playing)
+
+const flashStyle = computed(() => {
+  const tone = flashTone.value
+  if (!tone) return {}
+  return {
+    boxShadow: `inset 0 0 ${Math.round(110 + tone.ratio * 80)}px ${Math.round(22 + tone.ratio * 28)}px ${tone.glow}`
+  }
+})
 
 const dialogState = computed(() => ({
   swapVisible: swapVisible.value,
@@ -163,7 +172,7 @@ const dialogState = computed(() => ({
     <div
       v-if="flashGrade"
       class="game-page__flash"
-      :class="`game-page__flash--${flashGrade}`"
+      :style="flashStyle"
     />
   </div>
 </template>
@@ -214,35 +223,6 @@ const dialogState = computed(() => ({
     z-index: 60;
     pointer-events: none;
     animation: game-flash 0.7s ease-out forwards;
-
-    &--good {
-      box-shadow: inset 0 0 140px 36px #35c48c66;
-    }
-
-    &--neutral,
-    &--normal {
-      box-shadow: inset 0 0 110px 26px #7ea8cc44;
-    }
-
-    &--bad {
-      box-shadow: inset 0 0 130px 32px #e08b3a66;
-    }
-
-    &--disaster {
-      box-shadow: inset 0 0 160px 44px #e35d6a88;
-    }
-
-    &--small {
-      box-shadow: inset 0 0 110px 24px #4d6f8f44;
-    }
-
-    &--big {
-      box-shadow: inset 0 0 150px 40px #35c48c77;
-    }
-
-    &--jackpot {
-      box-shadow: inset 0 0 190px 56px #f2c14e88;
-    }
   }
 }
 

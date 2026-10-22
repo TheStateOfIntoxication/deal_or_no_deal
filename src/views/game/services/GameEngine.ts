@@ -1,4 +1,4 @@
-import { createGameConfig, TOTAL_ROUNDS } from '@/config/game'
+import { createGameConfig, K_ABSOLUTE_MAX, K_ABSOLUTE_MIN, TOTAL_ROUNDS } from '@/config/game'
 import type { GameConfig } from '@/config/game'
 import { BankerProfileEnum, getBankerProfile } from '@/config/bankers'
 import type { BankerProfile } from '@/config/bankers'
@@ -127,13 +127,16 @@ export class GameEngine {
     this.personaStrategy = getPersonaStrategy(personaId)
     this.random = createRandom(this.config.seed)
     this.bankerRandom = createRandom(deriveSeed(this.random.seed, 'banker'))
-    const k = this.config.randomKEnabled
+    const forcedK = this.personaStrategy.getForcedStartK?.(this.modeId) ?? null
+    const k = forcedK ?? (this.config.randomKEnabled
       ? (topCount ?? PoolBuilder.resolveK(this.config, this.random))
-      : this.config.fixedK
-    const minCount = this.config.randomKEnabled ? this.config.kMin : 1
-    const maxCount = this.config.randomKEnabled
-      ? this.config.kMax
-      : this.config.totalCases - 1
+      : this.config.fixedK)
+    const minCount = forcedK !== null
+      ? K_ABSOLUTE_MIN
+      : this.config.randomKEnabled ? this.config.kMin : 1
+    const maxCount = forcedK !== null
+      ? K_ABSOLUTE_MAX
+      : this.config.randomKEnabled ? this.config.kMax : this.config.totalCases - 1
     if (!Number.isInteger(k) || k < minCount || k > maxCount) {
       this.state = GameEngine.createIdleState(this.personaStrategy)
       return { ok: false, error: EngineErrorEnum.invalidDraw }
