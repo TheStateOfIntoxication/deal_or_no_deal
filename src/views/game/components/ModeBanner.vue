@@ -80,4 +80,33 @@ const props = defineProps<{ mode: GameModeDefinition }>()
     }
   }
 }
+@media (max-width: 640px) {
+  .mode-banner {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+    padding: 7px 10px;
+
+    &__head {
+      gap: 2px 8px;
+    }
+
+    &__tagline {
+      display: none;
+    }
+
+    &__name {
+      font-size: 13px;
+    }
+
+    &__stat {
+      font-size: 9px;
+    }
+
+    &__rules {
+      gap: 1px 10px;
+      font-size: 10px;
+    }
+  }
+}
 </style>

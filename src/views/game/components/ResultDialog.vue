@@ -39,7 +39,7 @@ const payoutText = computed(() =>
 <template>
   <el-dialog
     :model-value="visible"
-    width="520px"
+    width="min(520px, 92vw)"
     align-center
     :show-close="false"
     :close-on-click-modal="false"
@@ -130,7 +130,7 @@ const payoutText = computed(() =>
 
   &__prize {
     margin: 4px 0 2px;
-    font-size: 46px;
+    font-size: clamp(32px, 10vw, 46px);
     font-weight: 700;
     text-align: center;
     color: var(--dond-gold);
@@ -217,6 +217,23 @@ const payoutText = computed(() =>
 
     :deep(.el-button) {
       min-width: 150px;
+    }
+  }
+}
+
+@media (max-width: 480px) {
+  .result-dialog {
+    &__details {
+      grid-template-columns: 1fr;
+    }
+
+    &__actions {
+      flex-direction: column;
+
+      :deep(.el-button) {
+        width: 100%;
+        min-width: 0;
+      }
     }
   }
 }

@@ -332,6 +332,13 @@ const planText = computed(() => formatSignedPercent(props.plan?.delta ?? 0))
   }
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .banker-card--angry,
+  .banker-card--furious {
+    animation: none;
+  }
+}
+
 @keyframes banker-shiver {
   0%,
   100% {

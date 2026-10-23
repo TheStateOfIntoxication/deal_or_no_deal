@@ -208,6 +208,8 @@ export interface PersonaState {
   actionAvailable: boolean
   /** 主动能力是否已经用掉 */
   actionUsed: boolean
+  /** 本局已打开的箱子数（含自动开箱） */
+  openedCount: number
   /** 已使用能力的文案标签 */
   actionLabelKey: MessageKey | null
   /** 钉子户骨气层数 */

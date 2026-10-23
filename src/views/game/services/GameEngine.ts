@@ -554,6 +554,7 @@ export class GameEngine {
     return {
       actionAvailable: actions.some((item) => item.enabled),
       actionUsed: state.personaState.actionUsed,
+      openedCount: state.personaState.openedCount,
       actionLabelKey: state.personaActionLabelKey,
       stacks: state.personaState.stacks,
       stackBonus: this.personaStrategy.getStackBonus?.(state.personaState) ?? 0

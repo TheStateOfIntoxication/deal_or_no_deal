@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import type { PlayerPersonaDefinition } from '@/config/personas'
 import type { PlayerPersonaEnum } from '@/types/game'
 
@@ -15,6 +15,9 @@ const emit = defineEmits<{
 
 const activeIndex = ref(0)
 const detailOpen = ref(false)
+const touchStartX = ref<number | null>(null)
+const suppressClick = ref(false)
+let suppressTimer: number | undefined
 
 const active = computed<PlayerPersonaDefinition>(
   () => props.personas[activeIndex.value] ?? props.personas[0] as PlayerPersonaDefinition
@@ -33,6 +36,11 @@ const emitPick = (): void => {
 }
 
 const focusRelative = (step: number): void => {
+  if (suppressClick.value) return
+  moveRelative(step)
+}
+
+const moveRelative = (step: number): void => {
   if (props.personas.length === 0) return
   activeIndex.value =
     (activeIndex.value + step + props.personas.length) % props.personas.length
@@ -41,13 +49,39 @@ const focusRelative = (step: number): void => {
 }
 
 const showDetail = (): void => {
+  if (suppressClick.value) return
   detailOpen.value = true
   emitPick()
 }
 
 const choose = (): void => {
+  if (suppressClick.value) return
   emitPick()
   emit('confirm')
+}
+
+const handleTouchStart = (event: TouchEvent): void => {
+  touchStartX.value = event.touches.length === 1 ? (event.touches[0]?.clientX ?? null) : null
+}
+
+const handleTouchEnd = (event: TouchEvent): void => {
+  const start = touchStartX.value
+  touchStartX.value = null
+  if (start === null) return
+  const end = event.changedTouches[0]?.clientX
+  if (end === undefined) return
+  const distance = end - start
+  if (Math.abs(distance) < 40) return
+  suppressClick.value = true
+  moveRelative(distance < 0 ? 1 : -1)
+  window.clearTimeout(suppressTimer)
+  suppressTimer = window.setTimeout(() => {
+    suppressClick.value = false
+  }, 300)
+}
+
+const handleTouchCancel = (): void => {
+  touchStartX.value = null
 }
 
 const starLabel = computed(() => `${active.value.difficulty}/3`)
@@ -71,11 +105,20 @@ onMounted(() => {
   }
   emitPick()
 })
+
+onBeforeUnmount(() => {
+  window.clearTimeout(suppressTimer)
+})
 </script>
 
 <template>
   <section class="persona-carousel" aria-live="polite">
-    <div class="persona-carousel__stage">
+    <div
+      class="persona-carousel__stage"
+      @touchstart.passive="handleTouchStart"
+      @touchend.passive="handleTouchEnd"
+      @touchcancel="handleTouchCancel"
+    >
       <button
         type="button"
         class="persona-carousel__arrow"
@@ -139,6 +182,9 @@ onMounted(() => {
     <div class="persona-carousel__detail" :class="{ 'persona-carousel__detail--open': detailOpen }">
       <p v-if="detailOpen" class="persona-carousel__trait">{{ $t(active.traitKey) }}</p>
       <p v-else class="persona-carousel__hint">{{ $t('PersonaDetailHint') }}</p>
+      <p v-if="!detailOpen" class="persona-carousel__touch-hint">
+        {{ $t('PersonaTouchHint') }}
+      </p>
       <span class="persona-carousel__difficulty">
         {{ $t('PersonaDifficulty') }} {{ starLabel }}
       </span>
@@ -162,6 +208,7 @@ onMounted(() => {
     align-items: center;
     justify-content: center;
     width: 100%;
+    touch-action: pan-y;
   }
 
   &__arrow {
@@ -336,6 +383,12 @@ onMounted(() => {
     color: var(--dond-text-dim);
   }
 
+  &__touch-hint {
+    display: none;
+    font-size: 11px;
+    color: var(--dond-text-dim);
+  }
+
   &__trait {
     font-size: 12px;
     line-height: 1.6;
@@ -350,7 +403,7 @@ onMounted(() => {
 
 @media (max-width: 760px) {
   .persona-carousel__stage {
-    grid-template-columns: 28px minmax(0, 1fr) 28px;
+    grid-template-columns: 44px minmax(0, 1fr) 44px;
     gap: 8px;
   }
 
@@ -359,18 +412,49 @@ onMounted(() => {
   }
 
   .persona-carousel__arrow {
-    width: 28px;
-    height: 48px;
-    font-size: 22px;
+    width: 44px;
+    height: 56px;
+    font-size: 24px;
   }
 
   .persona-carousel__card {
-    min-height: 300px;
+    min-height: 290px;
     padding: 20px 16px 16px;
   }
 
   .persona-carousel__emoji {
     font-size: 58px;
+  }
+
+  .persona-carousel__hint {
+    display: none;
+  }
+
+  .persona-carousel__touch-hint {
+    display: block;
+  }
+}
+
+@media (max-width: 420px) {
+  .persona-carousel__stage {
+    gap: 6px;
+  }
+
+  .persona-carousel__card {
+    min-height: 260px;
+    padding: 16px 12px 14px;
+  }
+
+  .persona-carousel__emoji {
+    font-size: 52px;
+  }
+
+  .persona-carousel__name {
+    font-size: 21px;
+  }
+
+  .persona-carousel__tagline {
+    font-size: 11px;
   }
 }
 

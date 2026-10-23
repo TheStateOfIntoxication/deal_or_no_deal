@@ -261,6 +261,19 @@ const dialogState = computed(() => ({
   }
 }
 
+@media (max-width: 640px) {
+  .game-page {
+    gap: 8px;
+    padding: 10px 10px 20px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .game-page__flash {
+    display: none;
+  }
+}
+
 @keyframes game-flash {
   0% {
     opacity: 0;

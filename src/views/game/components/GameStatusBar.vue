@@ -166,4 +166,60 @@ const roundProgress = computed(() =>
     background: var(--dond-gold-soft);
   }
 }
+
+@media (max-width: 640px) {
+  .status-bar {
+    gap: 8px 10px;
+    padding: 10px 12px;
+
+    &__brand {
+      flex-wrap: wrap;
+      gap: 3px 8px;
+    }
+
+    &__title {
+      font-size: 18px;
+      letter-spacing: 2px;
+    }
+
+    &__subtitle {
+      display: none;
+    }
+
+    &__badge {
+      padding: 1px 6px;
+      font-size: 9px;
+    }
+
+    &__stats {
+      justify-content: space-between;
+      width: 100%;
+      gap: 8px;
+    }
+
+    &__stat {
+      flex: 1;
+      min-width: 0;
+
+      dt {
+        font-size: 10px;
+      }
+
+      dd {
+        font-size: 14px;
+      }
+    }
+
+    &__actions {
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      width: 100%;
+    }
+
+    &__quota {
+      margin-right: auto;
+      font-size: 11px;
+    }
+  }
+}
 </style>

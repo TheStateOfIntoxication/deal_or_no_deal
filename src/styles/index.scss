@@ -77,3 +77,9 @@ html .el-dialog__header {
 html .el-overlay {
   backdrop-filter: blur(3px);
 }
+
+@media (prefers-reduced-motion: reduce), (update: slow) {
+  html .el-overlay {
+    backdrop-filter: none;
+  }
+}

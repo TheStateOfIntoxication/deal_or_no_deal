@@ -37,7 +37,7 @@ const hintKey = computed(() => {
 <template>
   <el-dialog
     :model-value="visible"
-    width="480px"
+    width="min(480px, 92vw)"
     align-center
     :show-close="false"
     :close-on-click-modal="false"
@@ -110,6 +110,19 @@ const hintKey = computed(() => {
 
     :deep(.el-button) {
       min-width: 150px;
+    }
+  }
+}
+
+@media (max-width: 480px) {
+  .swap-dialog {
+    &__actions {
+      flex-direction: column;
+
+      :deep(.el-button) {
+        width: 100%;
+        min-width: 0;
+      }
     }
   }
 }

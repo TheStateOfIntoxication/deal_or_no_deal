@@ -271,4 +271,29 @@ const caseClass = (item: CaseState): Record<string, boolean> => {
   }
 }
 
+@media (max-width: 420px) {
+  .case-grid {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 6px;
+
+    &__case {
+      min-height: 52px;
+      padding: 5px 2px;
+      aspect-ratio: 1.15;
+    }
+
+    &__no {
+      font-size: 13px;
+    }
+
+    &__amount {
+      font-size: 8px;
+    }
+
+    &__recommend {
+      bottom: -5px;
+      font-size: 8px;
+    }
+  }
+}
 </style>

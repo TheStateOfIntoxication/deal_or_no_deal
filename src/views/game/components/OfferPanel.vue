@@ -372,6 +372,37 @@ const offerRatioText = computed(() => {
   }
 }
 
+@media (max-width: 420px) {
+  .offer-panel {
+    max-height: 48vh;
+    padding: 10px 10px calc(12px + env(safe-area-inset-bottom));
+
+    &__amount {
+      font-size: 22px;
+    }
+
+    &__phone {
+      width: 28px;
+      height: 28px;
+      font-size: 14px;
+    }
+
+    &__label {
+      font-size: 10px;
+    }
+
+    &__meta {
+      font-size: 10px;
+    }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .offer-panel--shown {
+    animation: none;
+  }
+}
+
 @keyframes offer-panel-in {
   from {
     opacity: 0;

@@ -1,8 +1,9 @@
 <script lang="ts" setup>
 import { computed } from 'vue'
+import { ROGUE_INSTANT_WINDOW, ROGUE_INSTANT_WIN_CHANCE } from '@/config/personas'
 import { formatMoney } from '@/utils/money'
 import { formatSignedPercent } from '@/utils/percent'
-import type { MessageKey } from '@/language'
+import type { MessageKey, MessageParams } from '@/language'
 import { PlayerPersonaEnum } from '@/types/game'
 import type { PersonaActionEnum } from '@/types/game'
 import type { AudienceMemberState, AudienceReactionState, AudienceRecommendationState, BankerExpression, BankerOfferMetaState, CaseState, GameSnapshot } from '../types'
@@ -50,6 +51,29 @@ const emit = defineEmits<{
 const stackBonusText = computed(() =>
   formatSignedPercent(props.snapshot.personaState.stackBonus)
 )
+
+const personaNotice = computed<{ key: MessageKey; params: MessageParams } | null>(() => {
+  const { personaId, personaState } = props.snapshot
+  if (personaId === PlayerPersonaEnum.rogue) {
+    return personaState.openedCount > ROGUE_INSTANT_WINDOW
+      ? {
+          key: 'PersonaRogueWindowClosed',
+          params: { window: ROGUE_INSTANT_WINDOW } as MessageParams
+        }
+      : {
+          key: 'PersonaRogueWindow',
+          params: {
+            opened: personaState.openedCount,
+            window: ROGUE_INSTANT_WINDOW,
+            chance: Math.round(ROGUE_INSTANT_WIN_CHANCE * 100)
+          } as MessageParams
+        }
+  }
+  if (personaId === PlayerPersonaEnum.nagger && !props.snapshot.passiveNotice) {
+    return { key: 'PersonaNaggerHint', params: {} }
+  }
+  return null
+})
 </script>
 
 <template>
@@ -86,6 +110,13 @@ const stackBonusText = computed(() =>
         stacks: props.snapshot.personaState.stacks,
         percent: stackBonusText
       }) }}
+    </p>
+    <p
+      v-if="personaNotice"
+      class="game-table__persona-window"
+      :class="`game-table__persona-window--${props.snapshot.personaId}`"
+    >
+      {{ $t(personaNotice.key, personaNotice.params) }}
     </p>
     <p v-if="props.snapshot.passiveNotice" class="game-table__passive">
       {{ $t(
@@ -177,6 +208,35 @@ const stackBonusText = computed(() =>
     font-size: 11px;
     color: #ff9aa4;
     background: #e35d6a12;
+  }
+
+  &__persona-window {
+    padding: 5px 10px;
+    border: 1px solid #b79cff66;
+    border-radius: 8px;
+    font-size: 11px;
+    text-align: center;
+    color: #d8c9ff;
+    background: #b79cff12;
+
+    &--rogue {
+      border-color: #e35d6a66;
+      color: #ff9aa4;
+      background: #e35d6a12;
+    }
+  }
+}
+
+@media (max-width: 640px) {
+  .game-table {
+    gap: 10px;
+    padding: 10px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .game-table--shake {
+    animation: none;
   }
 }
 
