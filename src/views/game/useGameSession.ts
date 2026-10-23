@@ -607,7 +607,8 @@ export function useGameSession(): GameSessionApi {
       return
     }
 
-    removeConspiratorHint(caseNo)
+    removeOpenedConspiratorHints()
+    if (snapshot.value.phase === GamePhaseEnum.settled) persistResult()
 
     const opened = snapshot.value.lastOpened
     if (opened) {
@@ -654,11 +655,17 @@ export function useGameSession(): GameSessionApi {
     [CaseTierEnum.low]: 'BankerLineConspiratorClaimLow'
   }
 
-  const removeConspiratorHint = (caseNo: number): void => {
-    if (!(caseNo in conspiratorHints.value)) return
+  const removeOpenedConspiratorHints = (): void => {
     const next = { ...conspiratorHints.value }
-    delete next[caseNo]
-    conspiratorHints.value = next
+    let changed = false
+    for (const key of Object.keys(next)) {
+      const caseNo = Number(key)
+      if (snapshot.value.cases.some((item) => item.no === caseNo && item.opened)) {
+        delete next[caseNo]
+        changed = true
+      }
+    }
+    if (changed) conspiratorHints.value = next
   }
 
   /** Player picked a case after asking; show its persistent whisper without opening it */

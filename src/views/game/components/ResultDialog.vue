@@ -25,6 +25,7 @@ const emit = defineEmits<{ (e: 'restart'): void; (e: 'dismiss'): void }>()
 const decidedByText = computed(() => {
   if (props.result?.decidedBy === 'deal') return t('ResultDecidedByDeal')
   if (props.result?.decidedBy === 'certainty') return t('ResultDecidedByCertainty')
+  if (props.result?.decidedBy === 'rogue') return t('ResultDecidedByRogue')
   return t('ResultDecidedByCase')
 })
 const swappedText = computed(() =>

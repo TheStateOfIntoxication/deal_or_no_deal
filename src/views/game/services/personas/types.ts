@@ -8,6 +8,7 @@ export interface PersonaRuntimeState {
   pendingPenalty: boolean
   penaltiesUsed: number
   restorerUsed: boolean
+  openedCount: number
 }
 
 export interface PersonaOfferContext {
@@ -32,6 +33,8 @@ export interface PersonaCaseContext {
   topPrize: number
   playerCaseNo: number | null
   remainingCases: readonly PersonaRemainingCase[]
+  openedCaseNo: number
+  openedAmount: number
 }
 
 /** Pool mutation requested after a case is opened */
@@ -95,6 +98,10 @@ export interface PersonaStrategy {
     ctx: PersonaCaseContext,
     state: PersonaRuntimeState
   ) => PersonaCaseEffect | null
+  /** Returns a chance to instantly win after opening this case; engine rolls it */
+  getInstantWinChance?: (ctx: PersonaCaseContext, state: PersonaRuntimeState) => number
+  /** Returns candidate cases to auto-open; engine picks one and opens it without persona recursion */
+  getAutoOpenCaseNos?: (ctx: PersonaCaseContext, state: PersonaRuntimeState) => number[]
   getPrize?: (ctx: PersonaPrizeContext, state: PersonaRuntimeState) => PersonaPrizeResult | null
   getStackBonus?: (state: PersonaRuntimeState) => number
   getActions?: (ctx: PersonaActionContext, state: PersonaRuntimeState) => PersonaActionView[]

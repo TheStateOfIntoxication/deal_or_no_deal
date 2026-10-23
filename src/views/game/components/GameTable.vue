@@ -3,6 +3,7 @@ import { computed } from 'vue'
 import { formatMoney } from '@/utils/money'
 import { formatSignedPercent } from '@/utils/percent'
 import type { MessageKey } from '@/language'
+import { PlayerPersonaEnum } from '@/types/game'
 import type { PersonaActionEnum } from '@/types/game'
 import type { AudienceMemberState, AudienceReactionState, AudienceRecommendationState, BankerExpression, BankerOfferMetaState, CaseState, GameSnapshot } from '../types'
 import AudienceRow from './AudienceRow.vue'
@@ -87,10 +88,15 @@ const stackBonusText = computed(() =>
       }) }}
     </p>
     <p v-if="props.snapshot.passiveNotice" class="game-table__passive">
-      {{ $t('PassiveRestorerNotice', {
-        caseNo: props.snapshot.passiveNotice.caseNo,
-        amount: formatMoney(props.snapshot.passiveNotice.amount)
-      }) }}
+      {{ $t(
+        props.snapshot.passiveNotice.personaId === PlayerPersonaEnum.nagger
+          ? 'PassiveNaggerNotice'
+          : 'PassiveRestorerNotice',
+        {
+          caseNo: props.snapshot.passiveNotice.caseNo,
+          amount: formatMoney(props.snapshot.passiveNotice.amount)
+        }
+      ) }}
     </p>
     <OfferPanel
       :visible="props.offerVisible"

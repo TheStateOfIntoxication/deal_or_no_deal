@@ -1,5 +1,5 @@
 /** Where the prize came from: accepted Deal offer, the final opened case, or an early-certainty settlement */
-export type DecidedByType = 'deal' | 'case' | 'certainty'
+export type DecidedByType = 'deal' | 'case' | 'certainty' | 'rogue'
 
 /** Pre-game mode cards */
 export enum GameModeEnum {
@@ -18,6 +18,8 @@ export enum PlayerPersonaEnum {
   host = 'host',
   holdout = 'holdout',
   lucky = 'lucky',
+  nagger = 'nagger',
+  rogue = 'rogue',
   admin = 'admin'
 }
 

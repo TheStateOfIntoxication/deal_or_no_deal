@@ -52,6 +52,10 @@ export const HOLDOUT_STACK_BONUS = 0.03
 export const HOLDOUT_MAX_STACKS = 3
 /** Lucky: classic mode skips the k draw and starts with this many $1M cases */
 export const LUCKY_TOP_PRIZE_COUNT = 13
+/** Rogue: only the first N total opened cases can trigger the instant win */
+export const ROGUE_INSTANT_WINDOW = 2
+/** Rogue: chance to instantly win when a top prize is opened inside the window */
+export const ROGUE_INSTANT_WIN_CHANCE = 0.5
 
 export const PLAYER_PERSONAS: PlayerPersonaDefinition[] = [
   {
@@ -143,6 +147,26 @@ export const PLAYER_PERSONAS: PlayerPersonaDefinition[] = [
     emoji: '🍀',
     tone: 'green',
     difficulty: 1
+  },
+  {
+    id: PlayerPersonaEnum.nagger,
+    nameKey: 'PersonaNaggerName',
+    traitKey: 'PersonaNaggerTrait',
+    adviceDealKey: 'PersonaNaggerAdvice',
+    adviceHoldKey: 'PersonaNaggerAdvice',
+    emoji: '🗣️',
+    tone: 'violet',
+    difficulty: 2
+  },
+  {
+    id: PlayerPersonaEnum.rogue,
+    nameKey: 'PersonaRogueName',
+    traitKey: 'PersonaRogueTrait',
+    adviceDealKey: 'PersonaRogueAdvice',
+    adviceHoldKey: 'PersonaRogueAdvice',
+    emoji: '🦹',
+    tone: 'red',
+    difficulty: 3
   },
   {
     id: PlayerPersonaEnum.admin,

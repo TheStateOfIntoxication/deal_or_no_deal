@@ -7,6 +7,7 @@ import type { MessageKey } from '@/language'
 import { createRandom, deriveSeed, shuffle } from '@/utils/random'
 import type { RandomSource } from '@/utils/random'
 import { BankerPlanEnum, GameModeEnum, PersonaActionEnum, PlayerPersonaEnum } from '@/types/game'
+import type { DecidedByType } from '@/types/game'
 import { EngineErrorEnum, GamePhaseEnum } from '../types'
 import type {
   AmountRowState,
@@ -203,6 +204,10 @@ export class GameEngine {
 
   /** 开一个箱子；本轮开满后自动进入报价 */
   openCase(caseNo: number): EngineResult {
+    return this.openCaseWithEffects(caseNo, true)
+  }
+
+  private openCaseWithEffects(caseNo: number, applyPersona: boolean): EngineResult {
     const state = this.state
     if (state.phase === GamePhaseEnum.settled) {
       return GameEngine.reject(EngineErrorEnum.gameOver)
@@ -224,6 +229,7 @@ export class GameEngine {
     state.passiveNotice = null
     target.opened = true
     state.remainingToOpen -= 1
+    state.personaState.openedCount += 1
     const amount = this.amountOf(target)
     const entry: RoundOpenedState = {
       caseNo: target.no,
@@ -234,8 +240,55 @@ export class GameEngine {
     state.roundOpened.push(entry)
     state.lastOpened = entry
     this.resolveSideBet(amount)
-    this.applyPersonaCaseEffect()
+
+    if (!applyPersona) {
+      if (this.settleIfCertain()) return { ok: true }
+      if (state.remainingToOpen === 0) this.closeRound()
+      return { ok: true }
+    }
+
+    const context = this.personaCaseContext(target.no, amount)
+    this.applyPersonaCaseEffect(context)
+
+    const instantWinChance = this.personaStrategy.getInstantWinChance?.(
+      context,
+      state.personaState
+    ) ?? 0
+    if (instantWinChance > 0 && this.random.next() < instantWinChance) {
+      const others = this.unopenedOtherCases()
+      this.finishWithPrize(
+        this.config.topPrize,
+        'rogue',
+        false,
+        target.no,
+        this.config.topPrize,
+        this.playerCaseAmount(),
+        others.length === 1 ? this.amountOf(others[0]) : null
+      )
+      return { ok: true }
+    }
+
     if (this.settleIfCertain()) return { ok: true }
+
+    if (state.remainingToOpen > 0) {
+      const autoCaseNo = this.chooseAutoOpenCaseNo(context)
+      if (autoCaseNo !== null) {
+        const autoCase = state.cases.find((item) => item.no === autoCaseNo)
+        const autoAmount = autoCase ? this.amountOf(autoCase) : null
+        if (autoCase && autoAmount !== null) {
+          const autoResult = this.openCaseWithEffects(autoCaseNo, false)
+          if (autoResult.ok) {
+            state.passiveNotice = {
+              personaId: state.personaId,
+              caseNo: autoCaseNo,
+              amount: autoAmount
+            }
+          }
+          return autoResult
+        }
+      }
+    }
+
     if (state.remainingToOpen === 0) this.closeRound()
     return { ok: true }
   }
@@ -641,18 +694,24 @@ export class GameEngine {
       amount === this.config.topPrize ? 'lose' : 'win'
   }
 
-  private applyPersonaCaseEffect(): void {
+  private personaCaseContext(openedCaseNo: number, openedAmount: number): PersonaCaseContext {
     const state = this.state
     const unopenedCases = state.cases.filter((item) => !item.opened)
-    const context: PersonaCaseContext = {
+    return {
       topPrize: this.config.topPrize,
       playerCaseNo: state.playerCaseNo,
       remainingCases: unopenedCases.map((item) => ({
         caseNo: item.no,
         amount: this.amountOf(item),
         isPlayerCase: item.no === state.playerCaseNo
-      }))
+      })),
+      openedCaseNo,
+      openedAmount
     }
+  }
+
+  private applyPersonaCaseEffect(context: PersonaCaseContext): void {
+    const state = this.state
     const effect = this.personaStrategy.onCaseOpened?.(context, state.personaState)
     if (!effect || effect.candidateCaseNos.length === 0) return
 
@@ -670,9 +729,17 @@ export class GameEngine {
     }
   }
 
+  private chooseAutoOpenCaseNo(context: PersonaCaseContext): number | null {
+    if (this.state.remainingToOpen <= 0) return null
+    const candidates =
+      this.personaStrategy.getAutoOpenCaseNos?.(context, this.state.personaState) ?? []
+    if (candidates.length === 0) return null
+    return candidates[Math.floor(this.random.next() * candidates.length)] ?? null
+  }
+
   private finishWithPrize(
     basePrize: number,
-    decidedBy: 'deal' | 'case' | 'certainty',
+    decidedBy: DecidedByType,
     swapped: boolean,
     heldCaseNo: number,
     heldCaseAmount: number,

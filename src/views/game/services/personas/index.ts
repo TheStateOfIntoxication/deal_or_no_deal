@@ -21,7 +21,9 @@ import {
   PRAGMATIC_MAX_PENALTIES,
   PRAGMATIC_PENALTY,
   RAISER_OFFER_BOOST,
-  RESTORER_MIN_REMAINING
+  RESTORER_MIN_REMAINING,
+  ROGUE_INSTANT_WINDOW,
+  ROGUE_INSTANT_WIN_CHANCE
 } from '@/config/personas'
 import { GameModeEnum, PersonaActionEnum, PlayerPersonaEnum } from '@/types/game'
 import type {
@@ -41,7 +43,8 @@ function createRuntimeState(): PersonaRuntimeState {
     stacks: 0,
     pendingPenalty: false,
     penaltiesUsed: 0,
-    restorerUsed: false
+    restorerUsed: false,
+    openedCount: 0
   }
 }
 
@@ -215,6 +218,37 @@ const HOLDOUT: PersonaStrategy = {
   }
 }
 
+const NAGGER: PersonaStrategy = {
+  id: PlayerPersonaEnum.nagger,
+  canDeal: true,
+  audienceExtraMembers: 0,
+  createState: createRuntimeState,
+  getAutoOpenCaseNos(ctx) {
+    const selectable = ctx.remainingCases.filter((item) => !item.isPlayerCase)
+    if (selectable.length === 0) return []
+    const lowest = Math.min(...selectable.map((item) => item.amount))
+    if (ctx.openedAmount > lowest) return []
+    const candidates = selectable.filter((item) => item.amount !== ctx.topPrize)
+    if (candidates.length === 0) return []
+    const largest = Math.max(...candidates.map((item) => item.amount))
+    return candidates
+      .filter((item) => item.amount === largest)
+      .map((item) => item.caseNo)
+  }
+}
+
+const ROGUE: PersonaStrategy = {
+  id: PlayerPersonaEnum.rogue,
+  canDeal: true,
+  audienceExtraMembers: 0,
+  createState: createRuntimeState,
+  getInstantWinChance(ctx, state) {
+    if (state.openedCount > ROGUE_INSTANT_WINDOW) return 0
+    if (ctx.openedAmount !== ctx.topPrize) return 0
+    return ROGUE_INSTANT_WIN_CHANCE
+  }
+}
+
 const LUCKY: PersonaStrategy = {
   id: PlayerPersonaEnum.lucky,
   canDeal: true,
@@ -243,6 +277,8 @@ const PERSONA_STRATEGIES: Record<PlayerPersonaEnum, PersonaStrategy> = {
   [PlayerPersonaEnum.host]: HOST,
   [PlayerPersonaEnum.holdout]: HOLDOUT,
   [PlayerPersonaEnum.lucky]: LUCKY,
+  [PlayerPersonaEnum.nagger]: NAGGER,
+  [PlayerPersonaEnum.rogue]: ROGUE,
   [PlayerPersonaEnum.admin]: ADMIN
 }
 
