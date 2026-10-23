@@ -38,6 +38,11 @@ export const COLLECTOR_TOP_PRESENT_FACTOR = 0.96
 /** Collector: final offer factor after all top prizes are gone */
 export const COLLECTOR_TOP_GONE_FACTOR = 1.08
 
+/** Hothead: rage threshold / chance for a forced high-value open */
+export const HOTHEAD_TRIGGER_THRESHOLD = 70
+export const HOTHEAD_TRIGGER_CHANCE = 0.65
+export const HOTHEAD_HIGH_CANDIDATE_COUNT = 3
+
 /** Casino boss: side bet limits and payout factors */
 export const CASINO_SIDE_BET_MAX_USES = 2
 export const CASINO_SIDE_BET_WIN_FACTOR = 1.06

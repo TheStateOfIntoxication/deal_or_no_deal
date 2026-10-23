@@ -57,6 +57,17 @@ export const COLLECTOR_BANKER_PROFILE: BankerProfile = {
   lineTone: 'sharp'
 }
 
+export const HOTHEAD_BANKER_PROFILE: BankerProfile = {
+  id: BankerProfileEnum.hothead,
+  nameKey: 'BankerHotheadName',
+  traitKey: 'BankerHotheadTrait',
+  emoji: '😤',
+  tone: 'gold',
+  planWeights: {},
+  offerMode: 'curve',
+  lineTone: 'sharp'
+}
+
 export const CASINO_BANKER_PROFILE: BankerProfile = {
   id: BankerProfileEnum.casino,
   nameKey: 'BankerCasinoName',
@@ -73,7 +84,8 @@ export const BANKER_PROFILES = [
   CHARITY_BANKER_PROFILE,
   CONSPIRATOR_BANKER_PROFILE,
   COLLECTOR_BANKER_PROFILE,
-  CASINO_BANKER_PROFILE
+  CASINO_BANKER_PROFILE,
+  HOTHEAD_BANKER_PROFILE
 ]
 export const GAME_BANKER_IDS: BankerProfileEnum[] = BANKER_PROFILES.map((profile) => profile.id)
 
@@ -83,7 +95,8 @@ export const BANKER_ROTATION_WEIGHTS: Record<BankerProfileEnum, number> = {
   [BankerProfileEnum.charity]: 1,
   [BankerProfileEnum.conspirator]: 1,
   [BankerProfileEnum.collector]: 1,
-  [BankerProfileEnum.casino]: 1
+  [BankerProfileEnum.casino]: 1,
+  [BankerProfileEnum.hothead]: 1
 }
 const BANKER_PROFILE_MAP = new Map(BANKER_PROFILES.map((profile) => [profile.id, profile]))
 

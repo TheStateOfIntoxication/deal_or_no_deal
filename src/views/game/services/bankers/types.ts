@@ -25,6 +25,15 @@ export interface BankerQuirkResult {
   labelKey: MessageKey
 }
 
+export interface BankerForcedOpenRule {
+  /** Rage must be above this percentage (0-100) */
+  rageThreshold: number
+  chance: number
+  /** Number of highest-value candidates eligible below max rage */
+  highCandidateCount: number
+  resetRage: boolean
+}
+
 export interface BankerSideBetRule {
   maxUses: number
   winFactor: number
@@ -41,6 +50,7 @@ export interface BankerSideBetRule {
 export interface BankerStrategy {
   id: BankerProfileEnum
   sideBet?: BankerSideBetRule
+  forcedOpen?: BankerForcedOpenRule
   getQuirk?: (
     ctx: BankerQuirkContext,
     state: BankerRuntimeState

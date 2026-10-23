@@ -11,6 +11,7 @@ import type { DecidedByType } from '@/types/game'
 import { EngineErrorEnum, GamePhaseEnum } from '../types'
 import type {
   AmountRowState,
+  BankerForcedOpenState,
   BankerOfferMetaState,
   BankerPlanState,
   BankerSideBetState,
@@ -73,6 +74,7 @@ interface InternalState {
   audienceDelta: number
   planHistory: BankerPlanEnum[]
   passiveNotice: PassiveNoticeState | null
+  bankerForcedOpen: BankerForcedOpenState | null
   highestOffer: number
 }
 
@@ -179,6 +181,7 @@ export class GameEngine {
       audienceDelta: 0,
       planHistory: [],
       passiveNotice: null,
+      bankerForcedOpen: null,
       highestOffer: 0
     }
     return { ok: true }
@@ -227,6 +230,7 @@ export class GameEngine {
     }
 
     state.passiveNotice = null
+    state.bankerForcedOpen = null
     target.opened = true
     state.remainingToOpen -= 1
     state.personaState.openedCount += 1
@@ -339,6 +343,7 @@ export class GameEngine {
     state.currentOffer = null
     state.offerMeta = null
     state.personaActionLabelKey = null
+    state.bankerForcedOpen = null
     state.noDealCount += 1
     state.lastRejected = true
     state.rejectStreak += 1
@@ -351,7 +356,8 @@ export class GameEngine {
       state.remainingToOpen = this.config.openSequence[state.round - 1]
       state.roundOpened = []
       state.phase = GamePhaseEnum.opening
-      return { ok: true }
+      const forced = this.maybeForceBankerOpen()
+      return forced ? { ok: true, bankerForcedOpen: forced } : { ok: true }
     }
 
     if (this.config.swapEnabled && this.unopenedOtherCases().length === 1) {
@@ -569,8 +575,9 @@ export class GameEngine {
       topPrizeRemaining
     )
     const quirkLabelKey = this.bankerStrategy.getStatusKey?.(quirkContext) ?? null
+    const forcedOpen = state.bankerForcedOpen ? { ...state.bankerForcedOpen } : null
     const rule = this.bankerStrategy.sideBet
-    if (!rule) return { quirkLabelKey, sideBet: null }
+    if (!rule) return { quirkLabelKey, sideBet: null, forcedOpen }
 
     const sideBet: BankerSideBetState = {
       available:
@@ -590,7 +597,7 @@ export class GameEngine {
       winLabelKey: rule.winLabelKey,
       lossLabelKey: rule.lossLabelKey
     }
-    return { quirkLabelKey, sideBet }
+    return { quirkLabelKey, sideBet, forcedOpen }
   }
 
   private bankerQuirkContext(
@@ -606,6 +613,48 @@ export class GameEngine {
       lower: amounts.length > 0 ? Math.min(...amounts) : 0,
       upper: amounts.length > 0 ? Math.max(...amounts) : 0
     }
+  }
+
+  /** Hothead: after a rejected offer, may force-open a high-value case. */
+  private maybeForceBankerOpen(): BankerForcedOpenState | null {
+    const state = this.state
+    const rule = this.bankerStrategy.forcedOpen
+    if (!rule || state.phase !== GamePhaseEnum.opening) return null
+
+    const candidates = this.unopenedOtherCases()
+    if (candidates.length === 0) return null
+
+    const fullRage = state.rage >= RAGE_MAX
+    if (!fullRage) {
+      if (state.rage <= rule.rageThreshold) return null
+      if (this.bankerRandom.next() >= rule.chance) return null
+    }
+
+    const sorted = [...candidates].sort(
+      (left, right) => this.amountOf(right) - this.amountOf(left)
+    )
+    const pool = fullRage
+      ? sorted.slice(0, 1)
+      : sorted.slice(0, Math.max(1, rule.highCandidateCount))
+    const target = pool[Math.floor(this.bankerRandom.next() * pool.length)]
+    if (!target) return null
+
+    const amount = this.amountOf(target)
+    const previousRage = state.rage
+    if (rule.resetRage) state.rage = 0
+    const opened = this.openCaseWithEffects(target.no, false)
+    if (!opened.ok) {
+      state.rage = previousRage
+      return null
+    }
+
+    const notice: BankerForcedOpenState = {
+      caseNo: target.no,
+      amount,
+      reason: fullRage ? 'full' : 'threshold'
+    }
+    state.bankerForcedOpen = notice
+    return notice
   }
 
   private closeRound(): void {
@@ -885,6 +934,7 @@ export class GameEngine {
       audienceDelta: 0,
       planHistory: [],
       passiveNotice: null,
+      bankerForcedOpen: null,
       highestOffer: 0
     }
   }

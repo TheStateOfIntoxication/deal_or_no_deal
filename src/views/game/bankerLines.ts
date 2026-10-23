@@ -14,6 +14,7 @@ export type BankerEvent =
   | 'gloat'
   | 'annoyedSmall'
   | 'meltdown'
+  | 'forcedOpen'
   | 'planSteady'
   | 'planLowball'
   | 'planRebate'
@@ -41,6 +42,7 @@ const LINE_POOLS: Record<BankerEvent, MessageKey[]> = {
   gloat: ['BankerLineGloat1', 'BankerLineGloat2'],
   annoyedSmall: ['BankerLineAnnoyed1', 'BankerLineAnnoyed2'],
   meltdown: ['BankerLineMeltdown1', 'BankerLineMeltdown2'],
+  forcedOpen: ['BankerLineHotheadForced1', 'BankerLineHotheadForced2'],
   planSteady: ['BankerLinePlanSteady1', 'BankerLinePlanSteady2'],
   planLowball: ['BankerLinePlanLowball1', 'BankerLinePlanLowball2'],
   planRebate: ['BankerLinePlanRebate1', 'BankerLinePlanRebate2'],
@@ -78,6 +80,7 @@ const GENTLE_LINE_POOLS: Record<BankerEvent, MessageKey[]> = {
   gloat: ['BankerLineCharityGloat1'],
   annoyedSmall: ['BankerLineCharityGloat1'],
   meltdown: ['BankerLineCharityMeltdown1'],
+  forcedOpen: ['BankerLineHotheadForced1'],
   planSteady: ['BankerLineCharityPlan1'],
   planLowball: ['BankerLineCharityPlan1'],
   planRebate: ['BankerLineCharityPlan1'],

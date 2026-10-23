@@ -37,6 +37,7 @@ const props = defineProps<{
   conspiratorAskUsed: boolean
   conspiratorAsking: boolean
   conspiratorHints: Record<number, MessageKey>
+  inputLocked?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -97,6 +98,19 @@ const personaNotice = computed<{ key: MessageKey; params: MessageParams } | null
       :asking="props.conspiratorAsking"
       @ask="emit('conspirator-ask')"
     />
+    <p v-if="props.snapshot.bankerState.forcedOpen" class="game-table__forced-open">
+      {{
+        $t(
+          props.snapshot.bankerState.forcedOpen.reason === 'full'
+            ? 'BankerHotheadFullOpen'
+            : 'BankerHotheadTriggered',
+          {
+            caseNo: props.snapshot.bankerState.forcedOpen.caseNo,
+            amount: formatMoney(props.snapshot.bankerState.forcedOpen.amount)
+          }
+        )
+      }}
+    </p>
     <BankerSideBet
       :side-bet="props.snapshot.bankerState.sideBet"
       @bet="emit('side-bet')"
@@ -151,6 +165,7 @@ const personaNotice = computed<{ key: MessageKey; params: MessageParams } | null
       :remaining-to-open="props.snapshot.remainingToOpen"
       :recommended-case-nos="props.recommendedCaseNos"
       :hints="props.conspiratorHints"
+      :locked="props.inputLocked"
       @select="emit('select', $event)"
     />
     <AudienceRow
@@ -208,6 +223,16 @@ const personaNotice = computed<{ key: MessageKey; params: MessageParams } | null
     font-size: 11px;
     color: #ff9aa4;
     background: #e35d6a12;
+  }
+
+  &__forced-open {
+    padding: 6px 10px;
+    border: 1px solid #f2c14e66;
+    border-radius: 8px;
+    font-size: 11px;
+    text-align: center;
+    color: #f0c878;
+    background: #f2c14e12;
   }
 
   &__persona-window {

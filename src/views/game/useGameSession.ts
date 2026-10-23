@@ -95,6 +95,7 @@ export interface GameSessionApi {
   offerVisible: ComputedRef<boolean>
   swapVisible: ComputedRef<boolean>
   resultVisible: ComputedRef<boolean>
+  forcedOpenBusy: Ref<boolean>
   canReopenResult: ComputedRef<boolean>
   tableShaking: ComputedRef<boolean>
   bestPrize: ComputedRef<number>
@@ -171,6 +172,7 @@ export function useGameSession(): GameSessionApi {
   const pickedIndex = ref<number | null>(null)
 
   const offerReady = ref<boolean>(false)
+  const forcedOpenBusy = ref<boolean>(false)
   const finalRevealed = ref<boolean>(false)
   const resultReady = ref<boolean>(false)
   const resultDismissed = ref<boolean>(false)
@@ -199,6 +201,7 @@ export function useGameSession(): GameSessionApi {
   let flashTimer: number | undefined
   let revealTimer: number | undefined
   let resultTimer: number | undefined
+  let forcedOpenTimer: number | undefined
   let modeRandom = createRandom(deriveSeed(sessionSeed.value, 'mode'))
 
   const mode = computed<GameModeDefinition | null>(() =>
@@ -324,6 +327,7 @@ export function useGameSession(): GameSessionApi {
     }
   })
   const hint = computed<string>(() => {
+    if (forcedOpenBusy.value) return t('HintBankerForcedOpen')
     switch (phase.value) {
       case GamePhaseEnum.waitingPlayerCase:
         return t('HintChoosePlayerCase')
@@ -393,6 +397,7 @@ export function useGameSession(): GameSessionApi {
     window.clearTimeout(revealTimer)
     window.clearTimeout(resultTimer)
     window.clearTimeout(flashTimer)
+    window.clearTimeout(forcedOpenTimer)
   }
 
   /** 把观众情绪同步给引擎；角色策略决定是否把它转成报价修正 */
@@ -428,6 +433,7 @@ export function useGameSession(): GameSessionApi {
     audienceRecommendations.value = []
     audienceReactions.value = []
     offerReady.value = false
+    forcedOpenBusy.value = false
     finalRevealed.value = false
     resultReady.value = false
     resultDismissed.value = false
@@ -538,6 +544,7 @@ export function useGameSession(): GameSessionApi {
       return
     }
     clearError()
+    forcedOpenBusy.value = false
     setupPhase.value = SetupPhaseEnum.playing
     if (mode.value?.features.audience) {
       const strategy = getPersonaStrategy(personaId.value)
@@ -553,6 +560,7 @@ export function useGameSession(): GameSessionApi {
 
   /** 选箱阶段点击即选箱，开箱阶段点击即开箱 */
   const handleSelect = (caseNo: number): void => {
+    if (forcedOpenBusy.value) return
     const picking = phase.value === GamePhaseEnum.waitingPlayerCase
     // While the conspirator is waiting for a case, the click selects a whisper target.
     if (!picking && selectConspiratorHint(caseNo)) return
@@ -661,7 +669,7 @@ export function useGameSession(): GameSessionApi {
   }
 
   const handleConspiratorAsk = (): void => {
-    if (!conspiratorAskAvailable.value) return
+    if (forcedOpenBusy.value || !conspiratorAskAvailable.value) return
     conspiratorUsedRound.value = snapshot.value.round
     conspiratorAsking.value = true
     bankerLineKey.value = 'ConspiratorAskPrompt'
@@ -673,6 +681,7 @@ export function useGameSession(): GameSessionApi {
   }
 
   const handleDeal = (): void => {
+    if (forcedOpenBusy.value) return
     const result = engine.deal()
     if (!result.ok) {
       reject(result.error)
@@ -685,13 +694,46 @@ export function useGameSession(): GameSessionApi {
   }
 
   const handleNoDeal = (): void => {
+    if (forcedOpenBusy.value) return
     const result = engine.noDeal()
     if (!result.ok) {
       reject(result.error)
       return
     }
+    const forcedOpen = result.ok ? result.bankerForcedOpen : undefined
     clearError()
     refresh()
+
+    if (forcedOpen) {
+      // The banker acts before the player can touch the table; hold the input
+      // while the forced opening is revealed.
+      forcedOpenBusy.value = true
+      window.clearTimeout(forcedOpenTimer)
+      forcedOpenTimer = window.setTimeout(() => {
+        forcedOpenBusy.value = false
+      }, REVEAL_HOLD_MS)
+
+      const opened = snapshot.value.lastOpened
+      if (opened) {
+        playOpen()
+        playGrade(opened.grade)
+        const tone = AmountGrader.toneOf(
+          opened.amount,
+          snapshot.value.amountRows.map((row) => row.amount)
+        )
+        flash(opened.grade, tone)
+      }
+      if (phase.value === GamePhaseEnum.opening) {
+        startAudienceRound()
+        startConspiratorRound()
+      } else {
+        audienceRecommendations.value = []
+      }
+      if (phase.value === GamePhaseEnum.settled) persistResult()
+      pickBankerLine('forcedOpen')
+      return
+    }
+
     if (phase.value === GamePhaseEnum.settled) {
       persistResult()
     } else if (phase.value === GamePhaseEnum.opening) {
@@ -709,6 +751,7 @@ export function useGameSession(): GameSessionApi {
 
   /** 主持人的造势/圆场：引擎改报价和怒气，会话层落观众情绪 */
   const handlePersonaAction = (action: PersonaActionEnum): void => {
+    if (forcedOpenBusy.value) return
     const result = engine.usePersonaAction(action)
     if (!result.ok) {
       reject(result.error)
@@ -724,6 +767,7 @@ export function useGameSession(): GameSessionApi {
 
   /** 赌场老板：押下一箱不是顶奖 */
   const handleSideBet = (): void => {
+    if (forcedOpenBusy.value) return
     const result = engine.placeSideBet()
     if (!result.ok) {
       reject(result.error)
@@ -734,6 +778,7 @@ export function useGameSession(): GameSessionApi {
   }
 
   const handleSwap = (shouldSwap: boolean): void => {
+    if (forcedOpenBusy.value) return
     const result = engine.swap(shouldSwap)
     if (!result.ok) {
       reject(result.error)
@@ -844,6 +889,7 @@ export function useGameSession(): GameSessionApi {
     offerVisible,
     swapVisible,
     resultVisible,
+    forcedOpenBusy,
     tableShaking,
     bestPrize,
     flashGrade,

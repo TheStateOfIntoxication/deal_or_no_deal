@@ -7,7 +7,8 @@ export enum BankerProfileEnum {
   charity = 'charity',
   conspirator = 'conspirator',
   collector = 'collector',
-  casino = 'casino'
+  casino = 'casino',
+  hothead = 'hothead'
 }
 
 /** One banker personality: plan bias, line tone, and future offer mode */

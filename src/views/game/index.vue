@@ -37,6 +37,7 @@ const {
   offerVisible,
   swapVisible,
   resultVisible,
+  forcedOpenBusy,
   canReopenResult,
   tableShaking,
   bestPrize,
@@ -177,6 +178,7 @@ const dialogState = computed(() => ({
           :audience-recommendations="audienceRecommendations"
           :audience-reactions="audienceReactions"
           :table-shaking="tableShaking"
+          :input-locked="forcedOpenBusy"
           :is-conspirator="isConspirator"
           :conspirator-ask-available="conspiratorAskAvailable"
           :conspirator-ask-used="conspiratorAskUsed"

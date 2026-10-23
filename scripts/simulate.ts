@@ -3,7 +3,7 @@
  * Usage: npx vite-node scripts/simulate.ts [gamesPerCombo]
  *
  * Coverage:
- * - 12 personas × 2 modes × 5 bankers × 4 deal strategies
+ * - 12 personas × 2 modes × 6 bankers × 4 deal strategies
  * - host active action (hype when offer/EV < 0.65)
  * - casino side bet (always place when available)
  * - audience director + conformist mood delta

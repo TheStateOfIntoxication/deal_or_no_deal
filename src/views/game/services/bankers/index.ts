@@ -3,7 +3,10 @@ import {
   CASINO_SIDE_BET_MAX_USES,
   CASINO_SIDE_BET_WIN_FACTOR,
   COLLECTOR_TOP_GONE_FACTOR,
-  COLLECTOR_TOP_PRESENT_FACTOR
+  COLLECTOR_TOP_PRESENT_FACTOR,
+  HOTHEAD_HIGH_CANDIDATE_COUNT,
+  HOTHEAD_TRIGGER_CHANCE,
+  HOTHEAD_TRIGGER_THRESHOLD
 } from '@/config/banker'
 import { BankerProfileEnum } from '@/config/bankers'
 import type { BankerQuirkContext, BankerRuntimeState, BankerStrategy } from './types'
@@ -43,12 +46,23 @@ const CASINO: BankerStrategy = {
   }
 }
 
+const HOTHEAD: BankerStrategy = {
+  id: BankerProfileEnum.hothead,
+  forcedOpen: {
+    rageThreshold: HOTHEAD_TRIGGER_THRESHOLD,
+    chance: HOTHEAD_TRIGGER_CHANCE,
+    highCandidateCount: HOTHEAD_HIGH_CANDIDATE_COUNT,
+    resetRage: true
+  }
+}
+
 const BANKER_STRATEGIES: Record<BankerProfileEnum, BankerStrategy> = {
   [BankerProfileEnum.default]: { id: BankerProfileEnum.default },
   [BankerProfileEnum.charity]: { id: BankerProfileEnum.charity },
   [BankerProfileEnum.conspirator]: { id: BankerProfileEnum.conspirator },
   [BankerProfileEnum.collector]: COLLECTOR,
-  [BankerProfileEnum.casino]: CASINO
+  [BankerProfileEnum.casino]: CASINO,
+  [BankerProfileEnum.hothead]: HOTHEAD
 }
 
 export function getBankerStrategy(id: BankerProfileEnum): BankerStrategy {

@@ -13,6 +13,7 @@ const props = defineProps<{
   remainingToOpen: number
   recommendedCaseNos?: number[]
   hints?: Record<number, MessageKey>
+  locked?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -23,6 +24,7 @@ const hoveredCaseNo = ref<number | null>(null)
 
 /** 当前阶段该箱子是否不可点击（R-5.2.1–R-5.2.3、R-11.3） */
 const isDisabled = (item: CaseState): boolean => {
+  if (props.locked) return true
   if (props.phase === GamePhaseEnum.waitingPlayerCase) return false
   if (props.phase !== GamePhaseEnum.opening) return true
   return item.opened || props.remainingToOpen === 0

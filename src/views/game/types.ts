@@ -244,9 +244,20 @@ export interface BankerSideBetState {
 }
 
 /** 银行家本局的可见状态 */
+export type BankerForcedOpenReason = 'threshold' | 'full'
+
+/** A forced case open caused by a banker skill */
+export interface BankerForcedOpenState {
+  caseNo: number
+  amount: number
+  reason: BankerForcedOpenReason
+}
+
+/** 银行家表现的可见状态 */
 export interface BankerState {
   quirkLabelKey: MessageKey | null
   sideBet: BankerSideBetState | null
+  forcedOpen: BankerForcedOpenState | null
 }
 
 /** 供界面渲染的只读快照 */
@@ -306,7 +317,9 @@ export interface GameSnapshot {
 }
 
 /** 引擎操作的统一返回：失败时不改变状态 */
-export type EngineResult = { ok: true } | { ok: false; error: EngineErrorEnum }
+export type EngineResult =
+  | { ok: true; bankerForcedOpen?: BankerForcedOpenState }
+  | { ok: false; error: EngineErrorEnum }
 
 /** 主动能力的结果；观众情绪由会话层落到 AudienceDirector */
 export type EngineActionResult =
