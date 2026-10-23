@@ -1,8 +1,9 @@
 <script lang="ts" setup>
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 import AmountBoard from './components/AmountBoard.vue'
 import GameDialogs from './components/GameDialogs.vue'
 import GameStatusBar from './components/GameStatusBar.vue'
+import HelpDrawer from './components/HelpDrawer.vue'
 import ModeBanner from './components/ModeBanner.vue'
 import GameTable from './components/GameTable.vue'
 import PlayerCaseStage from './components/PlayerCaseStage.vue'
@@ -18,6 +19,7 @@ const {
   personaId,
   mode,
   modeLabel,
+  persona,
   personaLabel,
   topPrizeLabel,
   drawCandidates,
@@ -77,6 +79,27 @@ const {
 } = useGameSession()
 
 const playing = computed(() => setupPhase.value === SetupPhaseEnum.playing)
+const helpVisible = ref<boolean>(false)
+const helpDrawerProps = computed(() => ({
+  visible: helpVisible.value,
+  mode: mode.value!,
+  persona: persona.value!,
+  bankerId: bankerId.value,
+  bankerName: bankerName.value,
+  bankerTrait: bankerTrait.value,
+  sideBet: snapshot.value.bankerState.sideBet,
+  plan: offerMeta.value?.plan ?? null,
+  adviceText: adviceText.value,
+  round: snapshot.value.round,
+  totalRounds: snapshot.value.totalRounds,
+  k: snapshot.value.k,
+  topPrize: snapshot.value.topPrize,
+  remainingCases: snapshot.value.remainingCaseCount
+}))
+
+watch(playing, (value) => {
+  if (!value) helpVisible.value = false
+})
 
 const flashStyle = computed(() => {
   const tone = flashTone.value
@@ -131,6 +154,7 @@ const dialogState = computed(() => ({
         :can-reopen-result="canReopenResult"
         @restart="resetDraw"
         @reopen-result="handleOpenResult"
+        @open-help="helpVisible = true"
       />
       <ModeBanner v-if="mode" :mode="mode" />
       <p class="game-page__hint">{{ hint }}</p>
@@ -171,6 +195,7 @@ const dialogState = computed(() => ({
         @restart="resetDraw"
         @dismiss="dismissResult"
       />
+      <HelpDrawer v-if="mode && persona" v-bind="helpDrawerProps" @close="helpVisible = false" />
     </template>
     <div
       v-if="flashGrade"

@@ -17,6 +17,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'restart'): void
   (e: 'reopen-result'): void
+  (e: 'open-help'): void
 }>()
 
 const { muted, toggleMuted } = useAudio()
@@ -58,6 +59,15 @@ const roundProgress = computed(() =>
         @click="toggleMuted"
       >
         {{ muted ? '🔇' : '🔊' }}
+      </el-button>
+      <el-button
+        circle
+        text
+        :title="$t('HelpTitle')"
+        :aria-label="$t('HelpTitle')"
+        @click="emit('open-help')"
+      >
+        ?
       </el-button>
       <el-button
         v-if="canReopenResult"
