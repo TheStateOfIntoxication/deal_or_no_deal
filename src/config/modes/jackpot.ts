@@ -8,6 +8,12 @@ export const JACKPOT_TOP_PRIZE_CENTS = 500_000_000
 /** Replace the $0.01 base amount with the universal guaranteed $1M */
 export const JACKPOT_BASE_AMOUNTS_CENTS = [...BASE_AMOUNTS_CENTS.slice(1), TOP_PRIZE_CENTS]
 
+/** Lucky in jackpot: 12 × $1M + the 13 highest classic amounts (25 base); $5M is the top */
+export const LUCKY_JACKPOT_BASE_AMOUNTS_CENTS = [
+  ...BASE_AMOUNTS_CENTS.slice(12),
+  ...Array<number>(12).fill(TOP_PRIZE_CENTS)
+]
+
 /** Jackpot: one unique $5M, at least one $1M, no k draw, 25 base + 1 top = 26 */
 export const JACKPOT_MODE: GameModeDefinition = {
   id: GameModeEnum.jackpot,

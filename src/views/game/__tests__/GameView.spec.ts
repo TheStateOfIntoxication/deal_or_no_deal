@@ -156,7 +156,7 @@ describe('游戏页冒烟', () => {
     const wrapper = mountGame()
     await wrapper.vm.$nextTick()
 
-    // 开局阶段：先选角色，再进入玩法卡；此时还没有箱池
+    // 开局阶段：先选角色，再进入随机模式；此时还没有箱池
     expect(wrapper.find('.persona-carousel').exists()).toBe(true)
     expect(wrapper.findAll('.mode-card')).toHaveLength(0)
     expect(wrapper.find('.case-grid__case').exists()).toBe(false)

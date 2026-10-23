@@ -1,15 +1,26 @@
 <script lang="ts" setup>
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import type { BankerProfileEnum } from '@/config/bankers'
 import type { GameModeDefinition } from '@/config/modes'
 import { PLAYER_PERSONAS } from '@/config/personas'
-import type { PlayerPersonaEnum } from '@/types/game'
+import { PlayerPersonaEnum } from '@/types/game'
 import BankerPicker from './BankerPicker.vue'
 import DrawPanel from './DrawPanel.vue'
 import JackpotIntro from './JackpotIntro.vue'
 import ModeCard from './ModeCard.vue'
 import PersonaCarousel from './PersonaCarousel.vue'
 import { SetupPhaseEnum } from '../types'
+
+function isDebugRequested(): boolean {
+  const search = window.location.search
+  const hashQuery = window.location.hash.includes('?')
+    ? window.location.hash.split('?')[1] ?? ''
+    : ''
+  return (
+    new URLSearchParams(search).get('debug') === '1' ||
+    new URLSearchParams(hashQuery).get('debug') === '1'
+  )
+}
 
 const props = defineProps<{
   setupPhase: SetupPhaseEnum
@@ -31,6 +42,20 @@ const emit = defineEmits<{
   (e: 'pick', index: number): void
   (e: 'start'): void
 }>()
+
+const debug = ref(isDebugRequested())
+const visiblePersonas = computed(() =>
+  debug.value
+    ? PLAYER_PERSONAS
+    : PLAYER_PERSONAS.filter((item) => item.id !== PlayerPersonaEnum.admin)
+)
+
+const toggleDebug = (): void => {
+  debug.value = !debug.value
+  if (!debug.value && props.personaId === PlayerPersonaEnum.admin) {
+    emit('persona-pick', visiblePersonas.value[0]?.id ?? PlayerPersonaEnum.pragmatic)
+  }
+}
 
 const isBankerStep = computed(() => props.setupPhase === SetupPhaseEnum.bankerPick)
 const isModeStep = computed(() => props.setupPhase === SetupPhaseEnum.modeReveal)
@@ -74,7 +99,7 @@ const hint = computed(() => {
 
     <template v-if="setupPhase === SetupPhaseEnum.personaPick">
       <PersonaCarousel
-        :personas="PLAYER_PERSONAS"
+        :personas="visiblePersonas"
         :selected-id="personaId"
         @pick="emit('persona-pick', $event)"
         @confirm="emit('persona-confirm')"
@@ -89,6 +114,9 @@ const hint = computed(() => {
           {{ $t('PersonaConfirm') }}
         </el-button>
       </div>
+      <button type="button" class="setup__debug" @click="toggleDebug">
+        {{ debug ? $t('DebugHide') : $t('DebugOpen') }}
+      </button>
     </template>
 
     <BankerPicker
@@ -181,6 +209,20 @@ const hint = computed(() => {
 
   &__detail-stat {
     color: #a8bfd6;
+  }
+
+  &__debug {
+    margin-top: -8px;
+    padding: 2px 8px;
+    border: 0;
+    font-size: 10px;
+    color: #6f8aa3;
+    background: transparent;
+    cursor: pointer;
+
+    &:hover {
+      color: var(--dond-text-dim);
+    }
   }
 
   &__actions {

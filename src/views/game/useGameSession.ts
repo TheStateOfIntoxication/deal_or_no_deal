@@ -1,7 +1,7 @@
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import type { ComputedRef, Ref } from 'vue'
 import { BankerProfileEnum, getBankerProfile } from '@/config/bankers'
-import { GAME_MODES, createModeGameConfig, getGameMode } from '@/config/modes'
+import { GAME_MODES, createModeGameConfig, createPersonaModeGameConfig, getGameMode } from '@/config/modes'
 import type { GameModeDefinition } from '@/config/modes'
 import { getPlayerPersona } from '@/config/personas'
 import type { PlayerPersonaDefinition } from '@/config/personas'
@@ -137,7 +137,7 @@ export interface GameSessionApi {
 }
 
 /**
- * 单局游戏会话：玩法卡/角色选择 → 摇奖或揭幕 → 开箱节奏 → 报价决策 → 结算
+ * 单局游戏会话：角色选择 → 随机模式 → 摇奖或揭幕 → 开箱节奏 → 报价决策 → 结算
  * 规则逻辑在 services/GameEngine；本 composable 只负责编排 UI 状态与观众表现
  */
 export function useGameSession(): GameSessionApi {
@@ -458,9 +458,9 @@ export function useGameSession(): GameSessionApi {
 
   /** Rebuild the engine with the chosen mode/banker and enter the mode setup */
   function enterModeSetup(): void {
-    if (!selectedMode.value) return
+    if (!selectedMode.value || !personaId.value) return
     engine = new GameEngine(
-      createModeGameConfig(selectedMode.value, sessionSeed.value),
+      createPersonaModeGameConfig(selectedMode.value, personaId.value, sessionSeed.value),
       selectedMode.value,
       bankerProfileId.value
     )
@@ -485,7 +485,7 @@ export function useGameSession(): GameSessionApi {
     const forcedK = strategy?.getForcedStartK?.(selectedMode.value) ?? null
     if (forcedK !== null) {
       engine = new GameEngine(
-        createModeGameConfig(selectedMode.value, sessionSeed.value),
+        createPersonaModeGameConfig(selectedMode.value, personaId.value ?? PlayerPersonaEnum.pragmatic, sessionSeed.value),
         selectedMode.value,
         bankerProfileId.value
       )
@@ -503,10 +503,7 @@ export function useGameSession(): GameSessionApi {
 
   const handlePersonaConfirm = (): void => {
     if (!personaId.value || setupPhase.value !== SetupPhaseEnum.personaPick) return
-    const strategy = getPersonaStrategy(personaId.value)
-    const forcedK = strategy.getForcedStartK?.(GameModeEnum.classic) ?? null
-    // Lucky still locks classic; every other persona (including admin) gets a random mode.
-    selectedModeIds.value = [forcedK !== null ? GameModeEnum.classic : pickRandomMode()]
+    selectedModeIds.value = [pickRandomMode()]
     setupPhase.value = SetupPhaseEnum.modeReveal
   }
 
