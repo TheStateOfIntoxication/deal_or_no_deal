@@ -56,7 +56,7 @@ function mountGame(): ReturnType<typeof mount> {
   })
 }
 
-/** 开局：选经典玩法卡 → 稳重角色 → 摇第一颗金球并开始，返回抽到的 k */
+/** 开局：选稳重角色 → 确认随机玩法 → 经典摇 k / 巨奖直接开始，返回顶奖数量 */
 async function passDraw(wrapper: ReturnType<typeof mount>): Promise<number> {
   const personaCard = wrapper.find('[data-persona="pragmatic"]')
   expect(personaCard.exists()).toBe(true)
@@ -70,10 +70,9 @@ async function passDraw(wrapper: ReturnType<typeof mount>): Promise<number> {
   await personaButton?.trigger('click')
   await wrapper.vm.$nextTick()
 
-  const modeCard = wrapper.find('[data-mode="classic"]')
+  const modeCard = wrapper.find('[data-mode]')
   expect(modeCard.exists()).toBe(true)
-  await modeCard.trigger('click')
-  await wrapper.vm.$nextTick()
+  const modeId = modeCard.attributes('data-mode')
 
   const modeButton = wrapper
     .findAll('.setup__actions button')
@@ -81,6 +80,16 @@ async function passDraw(wrapper: ReturnType<typeof mount>): Promise<number> {
   expect(modeButton).toBeDefined()
   await modeButton?.trigger('click')
   await wrapper.vm.$nextTick()
+
+  if (modeId === 'jackpot') {
+    const startButton = wrapper
+      .findAll('.jackpot-intro button')
+      .find((item) => item.text().includes(t('BtnStartGame')))
+    expect(startButton).toBeDefined()
+    await startButton?.trigger('click')
+    await wrapper.vm.$nextTick()
+    return 1
+  }
 
   const balls = wrapper.findAll('.draw-panel__ball')
   expect(balls).toHaveLength(5)
@@ -92,7 +101,7 @@ async function passDraw(wrapper: ReturnType<typeof mount>): Promise<number> {
   const drawnK = Number(
     (wrapper.find('.draw-panel__result-title').text().match(/×(\d+)/) ?? [])[1]
   )
-  expect(drawnK).toBeGreaterThanOrEqual(2)
+  expect(drawnK).toBeGreaterThanOrEqual(1)
 
   const startButton = wrapper
     .findAll('.draw-panel button')

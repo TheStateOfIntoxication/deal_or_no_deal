@@ -3,6 +3,7 @@ import { computed } from 'vue'
 import AmountBoard from './components/AmountBoard.vue'
 import GameDialogs from './components/GameDialogs.vue'
 import GameStatusBar from './components/GameStatusBar.vue'
+import ModeBanner from './components/ModeBanner.vue'
 import GameTable from './components/GameTable.vue'
 import PlayerCaseStage from './components/PlayerCaseStage.vue'
 import RevealChip from './components/RevealChip.vue'
@@ -13,11 +14,8 @@ import { SetupPhaseEnum } from './types'
 
 const {
   setupPhase,
-  modeDeck,
-  selectedMode,
   bankerId,
   personaId,
-  modeFaceUp,
   mode,
   modeLabel,
   personaLabel,
@@ -59,8 +57,6 @@ const {
   audienceRecommendations,
   audienceReactions,
   recommendedCaseNos,
-  handleModePick,
-  handleModeRethink,
   handleModeConfirm,
   handlePersonaPick,
   handlePersonaConfirm,
@@ -112,16 +108,12 @@ const dialogState = computed(() => ({
     <SetupScene
       v-if="!playing"
       :setup-phase="setupPhase"
-      :mode-deck="modeDeck"
-      :selected-mode="selectedMode"
       :mode="mode"
-      :persona-id="personaId" :banker-id="bankerId" :mode-face-up="modeFaceUp"
+      :persona-id="personaId" :banker-id="bankerId"
       :draw-candidates="drawCandidates"
       :picked-index="pickedIndex"
       :draw-lowest-amount="drawLowestAmount"
       :top-prize="topPrize"
-      @mode-pick="handleModePick"
-      @mode-rethink="handleModeRethink"
       @mode-confirm="handleModeConfirm"
       @persona-pick="handlePersonaPick"
       @persona-confirm="handlePersonaConfirm" @banker-pick="handleBankerPick" @banker-confirm="handleBankerConfirm"
@@ -140,6 +132,7 @@ const dialogState = computed(() => ({
         @restart="resetDraw"
         @reopen-result="handleOpenResult"
       />
+      <ModeBanner v-if="mode" :mode="mode" />
       <p class="game-page__hint">{{ hint }}</p>
       <p v-if="errorText" class="game-page__error">{{ errorText }}</p>
       <RevealChip v-if="revealVisible" :opened="lastOpened" />

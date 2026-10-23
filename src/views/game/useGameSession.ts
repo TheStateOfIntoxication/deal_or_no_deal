@@ -39,8 +39,6 @@ import { AudienceDirector } from './services/AudienceDirector'
 import { BankerRotation } from './services/BankerRotation'
 import { CaseTierEnum, createConspiratorHint } from './services/ConspiratorHint'
 import { getPersonaStrategy } from './services/personas'
-import { buildModeDeck } from './services/ModeDeckBuilder'
-import type { ModeCardState } from './services/ModeDeckBuilder'
 import { useAudio } from './useAudio'
 import { BANKER_PLAN_EVENTS, createBankerLinePicker } from './bankerLines'
 import type { BankerEvent } from './bankerLines'
@@ -74,11 +72,9 @@ const ERROR_KEYS: Record<EngineErrorEnum, MessageKey> = {
 /** 单局会话对外暴露的状态与操作 */
 export interface GameSessionApi {
   setupPhase: Ref<SetupPhaseEnum>
-  modeDeck: Ref<ModeCardState[]>
   selectedMode: ComputedRef<GameModeEnum | null>
   bankerId: Ref<BankerProfileEnum>
   personaId: Ref<PlayerPersonaEnum | null>
-  modeFaceUp: ComputedRef<boolean>
   mode: ComputedRef<GameModeDefinition | null>
   persona: ComputedRef<PlayerPersonaDefinition | null>
   modeLabel: ComputedRef<string>
@@ -121,8 +117,6 @@ export interface GameSessionApi {
   audienceRecommendations: Ref<AudienceRecommendationState[]>
   audienceReactions: Ref<AudienceReactionState[]>
   recommendedCaseNos: ComputedRef<number[]>
-  handleModePick: (index: number) => void
-  handleModeRethink: () => void
   handleModeConfirm: () => void
   handlePersonaPick: (id: PlayerPersonaEnum) => void
   handlePersonaConfirm: () => void
@@ -149,7 +143,6 @@ export interface GameSessionApi {
 export function useGameSession(): GameSessionApi {
   const sessionSeed = ref<number>(createSeed())
   const setupPhase = ref<SetupPhaseEnum>(SetupPhaseEnum.personaPick)
-  const modeDeck = ref<ModeCardState[]>([])
   /** Reserved for a future multi-mode persona; the current UI keeps exactly one id */
   const selectedModeIds = ref<GameModeEnum[]>([])
   const selectedMode = computed<GameModeEnum | null>(() => selectedModeIds.value[0] ?? null)
@@ -157,7 +150,6 @@ export function useGameSession(): GameSessionApi {
   const isAdmin = computed(
     () => !!personaId.value && getPersonaStrategy(personaId.value).adminControls === true
   )
-  const modeFaceUp = computed(() => isAdmin.value)
 
   let engine = new GameEngine(
     createModeGameConfig(GameModeEnum.classic, sessionSeed.value),
@@ -207,7 +199,7 @@ export function useGameSession(): GameSessionApi {
   let flashTimer: number | undefined
   let revealTimer: number | undefined
   let resultTimer: number | undefined
-  let lastModeOrder: GameModeEnum[] = []
+  let modeRandom = createRandom(deriveSeed(sessionSeed.value, 'mode'))
 
   const mode = computed<GameModeDefinition | null>(() =>
     selectedMode.value ? getGameMode(selectedMode.value) : null
@@ -421,23 +413,14 @@ export function useGameSession(): GameSessionApi {
     syncAudience()
   }
 
-  /** 回到玩法卡：新一局重新抽卡、抽角色、抽种子 */
+  /** 回到开局：新一局重新随机玩法、抽角色、抽种子 */
   const resetDraw = (): void => {
     clearTimers()
     sessionSeed.value = createSeed()
     setupPhase.value = SetupPhaseEnum.personaPick
     selectedModeIds.value = []
     personaId.value = null
-    let deck = buildModeDeck(
-      GAME_MODES.map((item) => item.id),
-      createRandom(deriveSeed(sessionSeed.value, 'deck'))
-    )
-    // Two cards have a 50% chance of the same shuffled order; avoid repeating visibly.
-    if (deck.length > 1 && deck.every((card, index) => card.modeId === lastModeOrder[index])) {
-      deck = [...deck].reverse()
-    }
-    lastModeOrder = deck.map((card) => card.modeId)
-    modeDeck.value = deck
+    modeRandom = createRandom(deriveSeed(sessionSeed.value, 'mode'))
     pickedIndex.value = null
     drawCandidates.value = []
     audienceDirector = null
@@ -467,26 +450,10 @@ export function useGameSession(): GameSessionApi {
     refresh()
   }
 
-  const handleModePick = (index: number): void => {
-    if (setupPhase.value !== SetupPhaseEnum.modeDraw && setupPhase.value !== SetupPhaseEnum.modeReveal) {
-      return
-    }
-    const card = modeDeck.value[index]
-    if (!card) return
-    modeDeck.value = modeDeck.value.map((item, itemIndex) => ({
-      ...item,
-      revealed: itemIndex === index
-    }))
-    selectedModeIds.value = [card.modeId]
-    setupPhase.value = SetupPhaseEnum.modeReveal
-    playDraw()
-  }
-
-  const handleModeRethink = (): void => {
-    if (setupPhase.value !== SetupPhaseEnum.modeReveal) return
-    modeDeck.value = modeDeck.value.map((card) => ({ ...card, revealed: false }))
-    selectedModeIds.value = []
-    setupPhase.value = SetupPhaseEnum.modeDraw
+  /** Randomly choose the mode for this run; no player draw and no admin override */
+  const pickRandomMode = (): GameModeEnum => {
+    const mode = GAME_MODES[Math.floor(modeRandom.next() * GAME_MODES.length)]
+    return mode?.id ?? GameModeEnum.classic
   }
 
   /** Rebuild the engine with the chosen mode/banker and enter the mode setup */
@@ -514,6 +481,18 @@ export function useGameSession(): GameSessionApi {
       setupPhase.value = SetupPhaseEnum.bankerPick
       return
     }
+    const strategy = personaId.value ? getPersonaStrategy(personaId.value) : null
+    const forcedK = strategy?.getForcedStartK?.(selectedMode.value) ?? null
+    if (forcedK !== null) {
+      engine = new GameEngine(
+        createModeGameConfig(selectedMode.value, sessionSeed.value),
+        selectedMode.value,
+        bankerProfileId.value
+      )
+      refresh()
+      beginGame(forcedK)
+      return
+    }
     enterModeSetup()
   }
 
@@ -524,24 +503,11 @@ export function useGameSession(): GameSessionApi {
 
   const handlePersonaConfirm = (): void => {
     if (!personaId.value || setupPhase.value !== SetupPhaseEnum.personaPick) return
-    const forcedK =
-      getPersonaStrategy(personaId.value).getForcedStartK?.(GameModeEnum.classic) ?? null
-    if (forcedK !== null) {
-      selectedModeIds.value = [GameModeEnum.classic]
-      engine = new GameEngine(
-        createModeGameConfig(GameModeEnum.classic, sessionSeed.value),
-        GameModeEnum.classic,
-        bankerProfileId.value
-      )
-      refresh()
-      beginGame(forcedK)
-      return
-    }
     const strategy = getPersonaStrategy(personaId.value)
-    modeDeck.value = strategy.adminControls
-      ? GAME_MODES.map((item) => ({ modeId: item.id, revealed: false }))
-      : modeDeck.value.map((card) => ({ ...card, revealed: false }))
-    setupPhase.value = SetupPhaseEnum.modeDraw
+    const forcedK = strategy.getForcedStartK?.(GameModeEnum.classic) ?? null
+    // Lucky still locks classic; every other persona (including admin) gets a random mode.
+    selectedModeIds.value = [forcedK !== null ? GameModeEnum.classic : pickRandomMode()]
+    setupPhase.value = SetupPhaseEnum.modeReveal
   }
 
   const handleBankerPick = (id: BankerProfileEnum): void => {
@@ -858,11 +824,9 @@ export function useGameSession(): GameSessionApi {
 
   return {
     setupPhase,
-    modeDeck,
     selectedMode,
     bankerId,
     personaId,
-    modeFaceUp,
     mode,
     persona,
     modeLabel,
@@ -904,8 +868,6 @@ export function useGameSession(): GameSessionApi {
     audienceRecommendations,
     audienceReactions,
     recommendedCaseNos,
-    handleModePick,
-    handleModeRethink,
     handleModeConfirm,
     handlePersonaPick,
     handlePersonaConfirm,
